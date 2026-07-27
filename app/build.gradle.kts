@@ -43,20 +43,9 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
-
     packaging {
         resources {
-            excludes += setOf(
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE",
-                "META-INF/LICENSE.txt",
-                "META-INF/license.txt",
-                "META-INF/NOTICE",
-                "META-INF/NOTICE.txt",
-                "META-INF/notice.txt",
-                "META-INF/ASL2.0",
-                "META-INF/INDEX.LIST"
-            )
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
@@ -65,8 +54,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
-    
-    // Compose
+
+    // Jetpack Compose BOM & UI
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -79,16 +68,10 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
-    // Google Drive / Cloud Sync Client
+    // Gson for Shift Object Serializer
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // Google Play Services & Google Drive API
     implementation("com.google.android.gms:play-services-auth:20.7.0")
-    implementation("com.google.apis:google-api-services-drive:v3-rev20230822-2.0.0") {
-        exclude(group = "org.apache.httpcomponents")
-        exclude(module = "guava-jdk5")
-    }
-    implementation("com.google.api-client:google-api-client-android:2.4.0") {
-        exclude(group = "org.apache.httpcomponents")
-        exclude(group = "com.google.android", module = "android")
-        exclude(module = "xpp3")
-    }
-    implementation("com.google.http-client:google-http-client-gson:1.44.1")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20230822-2.0.0")
 }
