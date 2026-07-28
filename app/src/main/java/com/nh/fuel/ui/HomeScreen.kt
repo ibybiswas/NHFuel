@@ -40,6 +40,7 @@ fun MainContainerScreen(
 ) {
     var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
+    var showThemeMenu by remember { mutableStateOf(false) }
 
     // Live Clock Engine
     LaunchedEffect(Unit) {
@@ -54,13 +55,13 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Edge-to-Edge Scrollable Content Layer
+        // 1. Edge-to-Edge Scrollable Layer (Passes underneath transparent Status & Navigation Bars)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
                     top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 62.dp
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 58.dp
                 )
         ) {
             when (selectedMainTab) {
@@ -81,7 +82,7 @@ fun MainContainerScreen(
             }
         }
 
-        // 2. Liquid Glass Header Overlay (Zero Extra Padding around Status Bar)
+        // 2. Liquid Glass Header Overlay with Integrated Theme Switcher Dropdown
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -93,40 +94,114 @@ fun MainContainerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
-                    .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
+                    .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Column {
-                    Text(
-                        text = "NH FUEL STATION",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp,
-                        letterSpacing = 1.1.sp,
-                        fontFamily = FontFamily.SansSerif,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = currentTimeString,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "NH FUEL STATION",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 16.sp,
+                            letterSpacing = 1.1.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = currentTimeString,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                        )
+                    }
+
+                    // Header Theme Dropdown Button
+                    Box {
+                        IconButton(
+                            onClick = { showThemeMenu = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = when (themeMode) {
+                                    ThemeMode.LIGHT -> Icons.Default.LightMode
+                                    ThemeMode.DARK -> Icons.Default.DarkMode
+                                    ThemeMode.AUTO -> Icons.Default.BrightnessAuto
+                                },
+                                contentDescription = "Theme Switcher",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showThemeMenu,
+                            onDismissRequest = { showThemeMenu = false }
+                        ) {
+                            Text(
+                                text = "Appearance",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Light", fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = if (themeMode == ThemeMode.LIGHT) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                onClick = {
+                                    onThemeModeChanged(ThemeMode.LIGHT)
+                                    showThemeMenu = false
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Dark", fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = if (themeMode == ThemeMode.DARK) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                onClick = {
+                                    onThemeModeChanged(ThemeMode.DARK)
+                                    showThemeMenu = false
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text("Auto (system default)", fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.BrightnessAuto, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = if (themeMode == ThemeMode.AUTO) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else null,
+                                onClick = {
+                                    onThemeModeChanged(ThemeMode.AUTO)
+                                    showThemeMenu = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // 3. Floating Glass Navigation Bar Pill
+        // 3. Floating Glass Navigation Bar Pill (Hugs edge without outer bottom background padding)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = 2.dp)
                 .align(Alignment.BottomCenter)
         ) {
             NavigationBar(
                 modifier = Modifier
-                    .height(58.dp)
+                    .height(56.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
                     .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), CircleShape),
@@ -315,55 +390,55 @@ fun HomeScreenContent(
             onShiftUpdated = { updatedShift ->
                 val newRecord = when (selectedShiftTab) {
                     1 -> {
-                        val s2Npd1P2 = if (updatedShift.npd1.petrolN2.isClosed) updatedShift.npd1.petrolN2.close else record.shift2.npd1.petrolN2.open
-                        val s2Npd1P3 = if (updatedShift.npd1.petrolN3.isClosed) updatedShift.npd1.petrolN3.close else record.shift2.npd1.petrolN3.open
-                        val s2Npd1D1 = if (updatedShift.npd1.dieselN1.isClosed) updatedShift.npd1.dieselN1.close else record.shift2.npd1.dieselN1.open
-                        val s2Npd1D4 = if (updatedShift.npd1.dieselN4.isClosed) updatedShift.npd1.dieselN4.close else record.shift2.npd1.dieselN4.open
+                        val s2Mpd1P2 = if (updatedShift.mpd1.petrolN2.isClosed) updatedShift.mpd1.petrolN2.close else record.shift2.mpd1.petrolN2.open
+                        val s2Mpd1P3 = if (updatedShift.mpd1.petrolN3.isClosed) updatedShift.mpd1.petrolN3.close else record.shift2.mpd1.petrolN3.open
+                        val s2Mpd1D1 = if (updatedShift.mpd1.dieselN1.isClosed) updatedShift.mpd1.dieselN1.close else record.shift2.mpd1.dieselN1.open
+                        val s2Mpd1D4 = if (updatedShift.mpd1.dieselN4.isClosed) updatedShift.mpd1.dieselN4.close else record.shift2.mpd1.dieselN4.open
 
-                        val s2Npd2P2 = if (updatedShift.npd2.petrolN2.isClosed) updatedShift.npd2.petrolN2.close else record.shift2.npd2.petrolN2.open
-                        val s2Npd2P3 = if (updatedShift.npd2.petrolN3.isClosed) updatedShift.npd2.petrolN3.close else record.shift2.npd2.petrolN3.open
-                        val s2Npd2D1 = if (updatedShift.npd2.dieselN1.isClosed) updatedShift.npd2.dieselN1.close else record.shift2.npd2.dieselN1.open
-                        val s2Npd2D4 = if (updatedShift.npd2.dieselN4.isClosed) updatedShift.npd2.dieselN4.close else record.shift2.npd2.dieselN4.open
+                        val s2Mpd2P2 = if (updatedShift.mpd2.petrolN2.isClosed) updatedShift.mpd2.petrolN2.close else record.shift2.mpd2.petrolN2.open
+                        val s2Mpd2P3 = if (updatedShift.mpd2.petrolN3.isClosed) updatedShift.mpd2.petrolN3.close else record.shift2.mpd2.petrolN3.open
+                        val s2Mpd2D1 = if (updatedShift.mpd2.dieselN1.isClosed) updatedShift.mpd2.dieselN1.close else record.shift2.mpd2.dieselN1.open
+                        val s2Mpd2D4 = if (updatedShift.mpd2.dieselN4.isClosed) updatedShift.mpd2.dieselN4.close else record.shift2.mpd2.dieselN4.open
 
                         val updatedShift2 = record.shift2.copy(
-                            npd1 = record.shift2.npd1.copy(
-                                petrolN2 = record.shift2.npd1.petrolN2.copy(open = s2Npd1P2),
-                                petrolN3 = record.shift2.npd1.petrolN3.copy(open = s2Npd1P3),
-                                dieselN1 = record.shift2.npd1.dieselN1.copy(open = s2Npd1D1),
-                                dieselN4 = record.shift2.npd1.dieselN4.copy(open = s2Npd1D4)
+                            mpd1 = record.shift2.mpd1.copy(
+                                petrolN2 = record.shift2.mpd1.petrolN2.copy(open = s2Mpd1P2),
+                                petrolN3 = record.shift2.mpd1.petrolN3.copy(open = s2Mpd1P3),
+                                dieselN1 = record.shift2.mpd1.dieselN1.copy(open = s2Mpd1D1),
+                                dieselN4 = record.shift2.mpd1.dieselN4.copy(open = s2Mpd1D4)
                             ),
-                            npd2 = record.shift2.npd2.copy(
-                                petrolN2 = record.shift2.npd2.petrolN2.copy(open = s2Npd2P2),
-                                petrolN3 = record.shift2.npd2.petrolN3.copy(open = s2Npd2P3),
-                                dieselN1 = record.shift2.npd2.dieselN1.copy(open = s2Npd2D1),
-                                dieselN4 = record.shift2.npd2.dieselN4.copy(open = s2Npd2D4)
+                            mpd2 = record.shift2.mpd2.copy(
+                                petrolN2 = record.shift2.mpd2.petrolN2.copy(open = s2Mpd2P2),
+                                petrolN3 = record.shift2.mpd2.petrolN3.copy(open = s2Mpd2P3),
+                                dieselN1 = record.shift2.mpd2.dieselN1.copy(open = s2Mpd2D1),
+                                dieselN4 = record.shift2.mpd2.dieselN4.copy(open = s2Mpd2D4)
                             )
                         )
                         record.copy(shift1 = updatedShift, shift2 = updatedShift2)
                     }
                     2 -> {
-                        val s3Npd1P2 = if (updatedShift.npd1.petrolN2.isClosed) updatedShift.npd1.petrolN2.close else record.shift3.npd1.petrolN2.open
-                        val s3Npd1P3 = if (updatedShift.npd1.petrolN3.isClosed) updatedShift.npd1.petrolN3.close else record.shift3.npd1.petrolN3.open
-                        val s3Npd1D1 = if (updatedShift.npd1.dieselN1.isClosed) updatedShift.npd1.dieselN1.close else record.shift3.npd1.dieselN1.open
-                        val s3Npd1D4 = if (updatedShift.npd1.dieselN4.isClosed) updatedShift.npd1.dieselN4.close else record.shift3.npd1.dieselN4.open
+                        val s3Mpd1P2 = if (updatedShift.mpd1.petrolN2.isClosed) updatedShift.mpd1.petrolN2.close else record.shift3.mpd1.petrolN2.open
+                        val s3Mpd1P3 = if (updatedShift.mpd1.petrolN3.isClosed) updatedShift.mpd1.petrolN3.close else record.shift3.mpd1.petrolN3.open
+                        val s3Mpd1D1 = if (updatedShift.mpd1.dieselN1.isClosed) updatedShift.mpd1.dieselN1.close else record.shift3.mpd1.dieselN1.open
+                        val s3Mpd1D4 = if (updatedShift.mpd1.dieselN4.isClosed) updatedShift.mpd1.dieselN4.close else record.shift3.mpd1.dieselN4.open
 
-                        val s3Npd2P2 = if (updatedShift.npd2.petrolN2.isClosed) updatedShift.npd2.petrolN2.close else record.shift3.npd2.petrolN2.open
-                        val s3Npd2P3 = if (updatedShift.npd2.petrolN3.isClosed) updatedShift.npd2.petrolN3.close else record.shift3.npd2.petrolN3.open
-                        val s3Npd2D1 = if (updatedShift.npd2.dieselN1.isClosed) updatedShift.npd2.dieselN1.close else record.shift3.npd2.dieselN1.open
-                        val s3Npd2D4 = if (updatedShift.npd2.dieselN4.isClosed) updatedShift.npd2.dieselN4.close else record.shift3.npd2.dieselN4.open
+                        val s3Mpd2P2 = if (updatedShift.mpd2.petrolN2.isClosed) updatedShift.mpd2.petrolN2.close else record.shift3.mpd2.petrolN2.open
+                        val s3Mpd2P3 = if (updatedShift.mpd2.petrolN3.isClosed) updatedShift.mpd2.petrolN3.close else record.shift3.mpd2.petrolN3.open
+                        val s3Mpd2D1 = if (updatedShift.mpd2.dieselN1.isClosed) updatedShift.mpd2.dieselN1.close else record.shift3.mpd2.dieselN1.open
+                        val s3Mpd2D4 = if (updatedShift.mpd2.dieselN4.isClosed) updatedShift.mpd2.dieselN4.close else record.shift3.mpd2.dieselN4.open
 
                         val updatedShift3 = record.shift3.copy(
-                            npd1 = record.shift3.npd1.copy(
-                                petrolN2 = record.shift3.npd1.petrolN2.copy(open = s3Npd1P2),
-                                petrolN3 = record.shift3.npd1.petrolN3.copy(open = s3Npd1P3),
-                                dieselN1 = record.shift3.npd1.dieselN1.copy(open = s3Npd1D1),
-                                dieselN4 = record.shift3.npd1.dieselN4.copy(open = s3Npd1D4)
+                            mpd1 = record.shift3.mpd1.copy(
+                                petrolN2 = record.shift3.mpd1.petrolN2.copy(open = s3Mpd1P2),
+                                petrolN3 = record.shift3.mpd1.petrolN3.copy(open = s3Mpd1P3),
+                                dieselN1 = record.shift3.mpd1.dieselN1.copy(open = s3Mpd1D1),
+                                dieselN4 = record.shift3.mpd1.dieselN4.copy(open = s3Mpd1D4)
                             ),
-                            npd2 = record.shift3.npd2.copy(
-                                petrolN2 = record.shift3.npd2.petrolN2.copy(open = s3Npd2P2),
-                                petrolN3 = record.shift3.npd2.petrolN3.copy(open = s3Npd2P3),
-                                dieselN1 = record.shift3.npd2.dieselN1.copy(open = s3Npd2D1),
-                                dieselN4 = record.shift3.npd2.dieselN4.copy(open = s3Npd2D4)
+                            mpd2 = record.shift3.mpd2.copy(
+                                petrolN2 = record.shift3.mpd2.petrolN2.copy(open = s3Mpd2P2),
+                                petrolN3 = record.shift3.mpd2.petrolN3.copy(open = s3Mpd2P3),
+                                dieselN1 = record.shift3.mpd2.dieselN1.copy(open = s3Mpd2D1),
+                                dieselN4 = record.shift3.mpd2.dieselN4.copy(open = s3Mpd2D4)
                             )
                         )
                         record.copy(shift2 = updatedShift, shift3 = updatedShift3)
@@ -563,12 +638,12 @@ fun ShiftInputBlock(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(shiftTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
 
-        DispenserShiftCard("NPD 1", shift.npd1) { updatedNpd1 ->
-            onShiftUpdated(shift.copy(npd1 = updatedNpd1))
+        DispenserShiftCard("MPD 1", shift.mpd1) { updatedMpd1 ->
+            onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
         }
 
-        DispenserShiftCard("NPD 2", shift.npd2) { updatedNpd2 ->
-            onShiftUpdated(shift.copy(npd2 = updatedNpd2))
+        DispenserShiftCard("MPD 2", shift.mpd2) { updatedMpd2 ->
+            onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
         }
     }
 }
