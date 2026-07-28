@@ -44,7 +44,6 @@ fun MainContainerScreen(
     var currentTimeString by remember { mutableStateOf("") }
     var showThemeMenu by remember { mutableStateOf(false) }
 
-    // Live Clock Engine
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("EEE, dd MMM yyyy | hh:mm:ss a", Locale.getDefault()).format(Date())
@@ -57,7 +56,6 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Edge-to-Edge Scrollable Content
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -84,7 +82,7 @@ fun MainContainerScreen(
             }
         }
 
-        // 2. Liquid Glass Header Overlay
+        // Header Overlay
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -122,7 +120,6 @@ fun MainContainerScreen(
                         )
                     }
 
-                    // Theme Dropdown Icon Button
                     Box {
                         IconButton(
                             onClick = { showThemeMenu = true },
@@ -193,7 +190,7 @@ fun MainContainerScreen(
             }
         }
 
-        // 3. Floating Glass Bottom Navigation Bar Pill
+        // Floating Bottom Navigation Bar
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -340,8 +337,8 @@ fun HomeScreenContent(
             )
         }
 
-        // Tank Storage Cards with Exact Stock Calculation Logic
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Petrol Tank Card
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Petrol Tank Storage",
@@ -352,49 +349,58 @@ fun HomeScreenContent(
                 cumulativeShortage = record.petrolShortage,
                 currentStorage = record.currentPetrolStorage,
                 lastRefill = record.lastPetrolRefill,
-                onExactStockChange = { newExactStock ->
-                    val diff = newExactStock - record.currentPetrolStorage
+                onExactStockChange = { newDipReading ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                    val isFirstEntry = record.petrolRefill == 0.0 && record.petrolShortage == 0.0 && record.totalPetrolSell == 0.0
 
-                    if (diff > 100.0) { // Big jump -> Refill
-                        onRecordChanged(
-                            record.copy(
-                                petrolTotal = newExactStock,
-                                petrolRefill = record.petrolRefill + diff,
-                                lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr)
-                            )
-                        )
-                    } else if (diff < 0.0) { // Lower reading -> Shortage
-                        val shortage = -diff
-                        onRecordChanged(
-                            record.copy(
-                                petrolTotal = newExactStock,
-                                petrolShortage = record.petrolShortage + shortage
-                            )
-                        )
+                    if (isFirstEntry) {
+                        onRecordChanged(record.copy(petrolTotal = newDipReading))
                     } else {
-                        onRecordChanged(record.copy(petrolTotal = newExactStock))
+                        val expectedStock = record.currentPetrolStorage
+                        val diff = newDipReading - expectedStock
+
+                        if (diff > 100.0) {
+                            onRecordChanged(
+                                record.copy(
+                                    petrolTotal = newDipReading,
+                                    petrolRefill = record.petrolRefill + diff,
+                                    lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr)
+                                )
+                            )
+                        } else if (diff < 0.0) {
+                            val shortage = -diff
+                            onRecordChanged(
+                                record.copy(
+                                    petrolTotal = newDipReading,
+                                    petrolShortage = record.petrolShortage + shortage
+                                )
+                            )
+                        } else {
+                            onRecordChanged(record.copy(petrolTotal = newDipReading))
+                        }
                     }
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val updatedRefill = record.petrolRefill + addedLitre
-                    val newCurrent = (record.petrolTotal + updatedRefill) - record.petrolShortage - record.totalPetrolSell
+                    val newRefill = record.petrolRefill + addedLitre
+                    // Sync Exact Stock with the newly increased Current Stock
+                    val newCalculatedStock = (record.petrolTotal + addedLitre)
                     onRecordChanged(
                         record.copy(
-                            petrolRefill = updatedRefill,
-                            petrolTotal = newCurrent,
+                            petrolTotal = newCalculatedStock,
+                            petrolRefill = newRefill,
                             lastPetrolRefill = RefillEvent(amount = addedLitre, timestamp = nowStr)
                         )
                     )
                 },
                 onAddShortage = { addedShortage ->
-                    val updatedShortage = record.petrolShortage + addedShortage
-                    val newCurrent = (record.petrolTotal + record.petrolRefill) - updatedShortage - record.totalPetrolSell
+                    val newShortage = record.petrolShortage + addedShortage
+                    // Sync Exact Stock with the newly decreased Current Stock
+                    val newCalculatedStock = (record.petrolTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
-                            petrolShortage = updatedShortage,
-                            petrolTotal = newCurrent
+                            petrolTotal = newCalculatedStock,
+                            petrolShortage = newShortage
                         )
                     )
                 },
@@ -403,6 +409,7 @@ fun HomeScreenContent(
                 }
             )
 
+            // Diesel Tank Card
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Diesel Tank Storage",
@@ -413,49 +420,58 @@ fun HomeScreenContent(
                 cumulativeShortage = record.dieselShortage,
                 currentStorage = record.currentDieselStorage,
                 lastRefill = record.lastDieselRefill,
-                onExactStockChange = { newExactStock ->
-                    val diff = newExactStock - record.currentDieselStorage
+                onExactStockChange = { newDipReading ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                    val isFirstEntry = record.dieselRefill == 0.0 && record.dieselShortage == 0.0 && record.totalDieselSell == 0.0
 
-                    if (diff > 100.0) { // Big jump -> Refill
-                        onRecordChanged(
-                            record.copy(
-                                dieselTotal = newExactStock,
-                                dieselRefill = record.dieselRefill + diff,
-                                lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr)
-                            )
-                        )
-                    } else if (diff < 0.0) { // Lower reading -> Shortage
-                        val shortage = -diff
-                        onRecordChanged(
-                            record.copy(
-                                dieselTotal = newExactStock,
-                                dieselShortage = record.dieselShortage + shortage
-                            )
-                        )
+                    if (isFirstEntry) {
+                        onRecordChanged(record.copy(dieselTotal = newDipReading))
                     } else {
-                        onRecordChanged(record.copy(dieselTotal = newExactStock))
+                        val expectedStock = record.currentDieselStorage
+                        val diff = newDipReading - expectedStock
+
+                        if (diff > 100.0) {
+                            onRecordChanged(
+                                record.copy(
+                                    dieselTotal = newDipReading,
+                                    dieselRefill = record.dieselRefill + diff,
+                                    lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr)
+                                )
+                            )
+                        } else if (diff < 0.0) {
+                            val shortage = -diff
+                            onRecordChanged(
+                                record.copy(
+                                    dieselTotal = newDipReading,
+                                    dieselShortage = record.dieselShortage + shortage
+                                )
+                            )
+                        } else {
+                            onRecordChanged(record.copy(dieselTotal = newDipReading))
+                        }
                     }
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val updatedRefill = record.dieselRefill + addedLitre
-                    val newCurrent = (record.dieselTotal + updatedRefill) - record.dieselShortage - record.totalDieselSell
+                    val newRefill = record.dieselRefill + addedLitre
+                    // Sync Exact Stock with the newly increased Current Stock
+                    val newCalculatedStock = (record.dieselTotal + addedLitre)
                     onRecordChanged(
                         record.copy(
-                            dieselRefill = updatedRefill,
-                            dieselTotal = newCurrent,
+                            dieselTotal = newCalculatedStock,
+                            dieselRefill = newRefill,
                             lastDieselRefill = RefillEvent(amount = addedLitre, timestamp = nowStr)
                         )
                     )
                 },
                 onAddShortage = { addedShortage ->
-                    val updatedShortage = record.dieselShortage + addedShortage
-                    val newCurrent = (record.dieselTotal + record.dieselRefill) - updatedShortage - record.totalDieselSell
+                    val newShortage = record.dieselShortage + addedShortage
+                    // Sync Exact Stock with the newly decreased Current Stock
+                    val newCalculatedStock = (record.dieselTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
-                            dieselShortage = updatedShortage,
-                            dieselTotal = newCurrent
+                            dieselTotal = newCalculatedStock,
+                            dieselShortage = newShortage
                         )
                     )
                 },
@@ -497,7 +513,7 @@ fun HomeScreenContent(
             petrolColor = petrolColor,
             dieselColor = dieselColor,
             onShiftUpdated = { updatedShift ->
-                var newRecord = when (selectedShiftTab) {
+                val newRecord = when (selectedShiftTab) {
                     1 -> {
                         val s2Mpd1P2 = if (updatedShift.mpd1.petrolN2.isClosed) updatedShift.mpd1.petrolN2.close else record.shift2.mpd1.petrolN2.open
                         val s2Mpd1P3 = if (updatedShift.mpd1.petrolN3.isClosed) updatedShift.mpd1.petrolN3.close else record.shift2.mpd1.petrolN3.open
@@ -554,12 +570,6 @@ fun HomeScreenContent(
                     }
                     else -> record.copy(shift3 = updatedShift)
                 }
-
-                // Sync Exact Stock with Current Stock after each shift update
-                newRecord = newRecord.copy(
-                    petrolTotal = newRecord.currentPetrolStorage,
-                    dieselTotal = newRecord.currentDieselStorage
-                )
 
                 onRecordChanged(newRecord)
             }
@@ -646,6 +656,8 @@ fun FuelTankCard(
     var newShortageInput by remember { mutableStateOf("") }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
+    val displayedExactStock = if (exactStock > 0.0) exactStock else currentStorage
+
     Card(
         modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -653,7 +665,7 @@ fun FuelTankCard(
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
-            // Half Length Exact Stock Box with Pencil Icon
+            // Half-Length Exact Stock Field with Pencil Icon
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -661,19 +673,19 @@ fun FuelTankCard(
             ) {
                 NumberField(
                     label = "Exact Stock",
-                    value = exactStock,
-                    modifier = Modifier.weight(0.7f)
-                ) {
-                    onExactStockChange(it)
+                    value = displayedExactStock,
+                    modifier = Modifier.weight(0.75f)
+                ) { inputVal ->
+                    onExactStockChange(inputVal)
                 }
 
                 IconButton(
-                    onClick = { onExactStockChange(exactStock) },
+                    onClick = { onExactStockChange(displayedExactStock) },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Dip Reading",
+                        contentDescription = "Edit Tank Dip",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
