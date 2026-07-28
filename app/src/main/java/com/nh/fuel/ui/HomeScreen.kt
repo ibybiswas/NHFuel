@@ -34,7 +34,7 @@ fun HomeScreen(
     var currentTimeString by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // Live Clock Update
+    // Live Clock Engine
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("EEE, dd MMM yyyy | hh:mm:ss a", Locale.getDefault()).format(Date())
@@ -115,10 +115,11 @@ fun HomeScreen(
                 )
             }
 
-            // Tank Storage Cards with Cumulative Refill & Shortage
+            // Tank Storage Row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Petrol Tank Block
+                // Petrol Tank Card
                 FuelTankCard(
+                    modifier = Modifier.weight(1f),
                     title = "Petrol Tank Storage",
                     color = Color(0xFFC62828),
                     initialStock = record.petrolTotal,
@@ -144,8 +145,9 @@ fun HomeScreen(
                     }
                 )
 
-                // Diesel Tank Block
+                // Diesel Tank Card
                 FuelTankCard(
+                    modifier = Modifier.weight(1f),
                     title = "Diesel Tank Storage",
                     color = Color(0xFF1565C0),
                     initialStock = record.dieselTotal,
@@ -193,7 +195,7 @@ fun HomeScreen(
                 )
             }
 
-            // Active Shift Readings
+            // Active Shift View
             val activeShift = when (selectedShiftTab) {
                 1 -> record.shift1
                 2 -> record.shift2
@@ -265,7 +267,7 @@ fun HomeScreen(
                 }
             )
 
-            // Sales Summary
+            // Shift Sales Summary
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth().border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
@@ -288,6 +290,7 @@ fun HomeScreen(
 
 @Composable
 fun FuelTankCard(
+    modifier: Modifier = Modifier,
     title: String,
     color: Color,
     initialStock: Double,
@@ -304,7 +307,7 @@ fun FuelTankCard(
     var newShortageInput by remember { mutableStateOf("") }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
-    Card(modifier = Modifier.weight(1f).border(1.dp, Color.Gray, RoundedCornerShape(8.dp))) {
+    Card(modifier = modifier.border(1.dp, Color.Gray, RoundedCornerShape(8.dp))) {
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
@@ -359,7 +362,7 @@ fun FuelTankCard(
 
             Divider(modifier = Modifier.padding(vertical = 2.dp))
 
-            // Last Refill Stamp & Edit Option
+            // Last Refill Timestamp & Edit Option
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
