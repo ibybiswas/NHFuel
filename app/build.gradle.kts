@@ -82,6 +82,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Room Database
     val roomVersion = "2.6.1"
@@ -89,10 +90,13 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
-    // Gson for Shift Object Serialization
+    // Jetpack DataStore Preferences (For Bottom Navigation Bar Opacity)
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Gson for Shift & Refill Object Serialization
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // Google Play Services & Google Drive API Client
+    // Google Play Services & Google Drive API Client Dependencies
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.api-client:google-api-client-android:2.2.0")
     implementation("com.google.apis:google-api-services-drive:v3-rev20230822-2.0.0")
