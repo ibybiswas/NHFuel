@@ -8,7 +8,8 @@ import androidx.compose.runtime.*
 import androidx.room.Room
 import com.nh.fuel.data.DailyFuelRecord
 import com.nh.fuel.data.FuelDatabase
-import com.nh.fuel.ui.HomeScreen
+import com.nh.fuel.ui.MainContainerScreen
+import com.nh.fuel.ui.NavBarPreferences
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -17,6 +18,7 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
 
     private lateinit var database: FuelDatabase
+    private lateinit var navBarPreferences: NavBarPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +28,8 @@ class MainActivity : ComponentActivity() {
             FuelDatabase::class.java,
             "nh_fuel_db"
         ).fallbackToDestructiveMigration().build()
+
+        navBarPreferences = NavBarPreferences(applicationContext)
 
         setContent {
             MaterialTheme {
@@ -37,8 +41,11 @@ class MainActivity : ComponentActivity() {
                 val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
                 val currentRecord = recordFlow.value ?: DailyFuelRecord(date = currentDate)
 
-                HomeScreen(
+                val navBarOpacity by navBarPreferences.opacityFlow.collectAsState(initial = 0.85f)
+
+                MainContainerScreen(
                     record = currentRecord,
+                    navBarOpacity = navBarOpacity,
                     onRecordChanged = { updatedRecord ->
                         coroutineScope.launch {
                             database.fuelDao().insertOrUpdate(updatedRecord)
@@ -46,6 +53,11 @@ class MainActivity : ComponentActivity() {
                     },
                     onDateSelected = { selectedDate ->
                         currentDate = selectedDate
+                    },
+                    onOpacityChanged = { newOpacity ->
+                        coroutineScope.launch {
+                            navBarPreferences.saveOpacity(newOpacity)
+                        }
                     }
                 )
             }
