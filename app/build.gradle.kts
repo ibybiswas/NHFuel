@@ -8,12 +8,16 @@ android {
     namespace = "com.nh.fuel"
     compileSdk = 34
 
+    // Dynamic Versioning from Gradle Properties (Passed via GitHub Actions workflow)
+    val vCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
+    val vName = project.findProperty("versionName")?.toString() ?: "1.0"
+
     defaultConfig {
         applicationId = "com.nh.fuel"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.1"
+        versionCode = vCode
+        versionName = vName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -93,7 +97,7 @@ dependencies {
     // Jetpack DataStore Preferences (For Bottom Navigation Bar Opacity)
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-    // Gson for Shift & Refill Object Serialization
+    // Gson for Serialization
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Google Play Services & Google Drive API Client Dependencies
