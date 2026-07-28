@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 data class RefillEvent(
     val amount: Double = 0.0,
-    val timestamp: String = "" // e.g., "2026-07-28 08:30 AM"
+    val timestamp: String = ""
 )
 
 data class NozzleShift(
@@ -29,41 +29,36 @@ data class DispenserShift(
 }
 
 data class DayShift(
-    val shiftNumber: Int, // 1, 2, or 3
-    val npd1: DispenserShift = DispenserShift(),
-    val npd2: DispenserShift = DispenserShift()
+    val shiftNumber: Int,
+    val mpd1: DispenserShift = DispenserShift(),
+    val mpd2: DispenserShift = DispenserShift()
 ) {
-    val petrolSale: Double get() = npd1.petrolSale + npd2.petrolSale
-    val dieselSale: Double get() = npd1.dieselSale + npd2.dieselSale
-    val isComplete: Boolean get() = npd1.isShiftComplete && npd2.isShiftComplete
+    val petrolSale: Double get() = mpd1.petrolSale + mpd2.petrolSale
+    val dieselSale: Double get() = mpd1.dieselSale + mpd2.dieselSale
+    val isComplete: Boolean get() = mpd1.isShiftComplete && mpd2.isShiftComplete
 }
 
 @Entity(tableName = "daily_fuel_records")
 data class DailyFuelRecord(
-    @PrimaryKey val date: String, // Format: YYYY-MM-DD
+    @PrimaryKey val date: String,
     
-    // Petrol Tank Storage & Refill/Shortage Tracking
     val petrolTotal: Double = 0.0,
-    val petrolRefill: Double = 0.0,      // Cumulative Total Refills
-    val petrolShortage: Double = 0.0,    // Cumulative Total Shortages
+    val petrolRefill: Double = 0.0,
+    val petrolShortage: Double = 0.0,
     val lastPetrolRefill: RefillEvent = RefillEvent(),
 
-    // Diesel Tank Storage & Refill/Shortage Tracking
     val dieselTotal: Double = 0.0,
-    val dieselRefill: Double = 0.0,      // Cumulative Total Refills
-    val dieselShortage: Double = 0.0,    // Cumulative Total Shortages
+    val dieselRefill: Double = 0.0,
+    val dieselShortage: Double = 0.0,
     val lastDieselRefill: RefillEvent = RefillEvent(),
 
-    // 3 Shifts for NPD1 & NPD2
     val shift1: DayShift = DayShift(1),
     val shift2: DayShift = DayShift(2),
     val shift3: DayShift = DayShift(3)
 ) {
-    // Total Daily Sales Across Shifts
     val totalPetrolSell: Double get() = shift1.petrolSale + shift2.petrolSale + shift3.petrolSale
     val totalDieselSell: Double get() = shift1.dieselSale + shift2.dieselSale + shift3.dieselSale
 
-    // Current Tank Storage Calculation: (Base Stock + Refills) - Shortages - Shift Sales
     val currentPetrolStorage: Double get() = (petrolTotal + petrolRefill) - petrolShortage - totalPetrolSell
     val currentDieselStorage: Double get() = (dieselTotal + dieselRefill) - dieselShortage - totalDieselSell
 }
