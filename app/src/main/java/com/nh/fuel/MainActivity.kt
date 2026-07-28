@@ -34,17 +34,6 @@ class MainActivity : ComponentActivity() {
         // Disable window fit insets to allow content to flow edge-to-edge
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.auto(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT
-            )
-        )
-
         database = Room.databaseBuilder(
             applicationContext,
             FuelDatabase::class.java,
@@ -59,6 +48,22 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
                 ThemeMode.AUTO -> isSystemInDarkTheme()
+            }
+
+            // Dynamically set system bar status icons (Dark icons on light BG / Light icons on dark BG)
+            LaunchedEffect(isDarkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        Color.TRANSPARENT,
+                        Color.TRANSPARENT,
+                        detectDarkMode = { isDarkTheme }
+                    ),
+                    navigationBarStyle = SystemBarStyle.auto(
+                        Color.TRANSPARENT,
+                        Color.TRANSPARENT,
+                        detectDarkMode = { isDarkTheme }
+                    )
+                )
             }
 
             val colorScheme = if (isDarkTheme) darkColorScheme() else lightColorScheme()
