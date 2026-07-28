@@ -83,7 +83,7 @@ fun HomeScreen(
                     Text(record.date, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1565C0))
                 }
                 IconButton(onClick = { showDatePicker = true }) {
-                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Date / Go Back to Older Records")
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Date")
                 }
             }
 
@@ -174,7 +174,7 @@ fun HomeScreen(
                 )
             }
 
-            // Shift Selector Tabs (Shift 1, Shift 2, Shift 3)
+            // Shift Selector Tabs
             TabRow(selectedTabIndex = selectedShiftTab - 1) {
                 Tab(
                     selected = selectedShiftTab == 1,
@@ -267,21 +267,50 @@ fun HomeScreen(
                 }
             )
 
-            // Shift Sales Summary
+            // Shift Sales Summary Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth().border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Shift $selectedShiftTab Sales:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("• Petrol Sold (NPD1 + NPD2): ${activeShift.petrolSale} L", color = Color(0xFFC62828), fontSize = 12.sp)
-                    Text("• Diesel Sold (NPD1 + NPD2): ${activeShift.dieselSale} L", color = Color(0xFF1565C0), fontSize = 12.sp)
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Shift Sales Breakdown:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+                    // Side-by-side Shift Sales Columns
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Shift 1 Sales
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Shift 1", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text("• Petrol: ${record.shift1.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
+                            Text("• Diesel: ${record.shift1.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                        }
+
+                        // Shift 2 Sales (Appears beside Shift 1 when active)
+                        if (record.shift1.isComplete || record.shift2.petrolSale > 0.0 || record.shift2.dieselSale > 0.0) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Shift 2", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("• Petrol: ${record.shift2.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
+                                Text("• Diesel: ${record.shift2.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                            }
+                        }
+
+                        // Shift 3 Sales (Appears beside Shift 2 when active)
+                        if (record.shift2.isComplete || record.shift3.petrolSale > 0.0 || record.shift3.dieselSale > 0.0) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Shift 3", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("• Petrol: ${record.shift3.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
+                                Text("• Diesel: ${record.shift3.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                            }
+                        }
+                    }
 
                     Divider(modifier = Modifier.padding(vertical = 4.dp))
 
                     Text("Total 24H Full Day Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("• Total Petrol Sell: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFFB71C1C), fontSize = 13.sp)
-                    Text("• Total Diesel Sell: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFF0D47A1), fontSize = 13.sp)
+                    Text("• Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFFB71C1C), fontSize = 13.sp)
+                    Text("• Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFF0D47A1), fontSize = 13.sp)
                 }
             }
         }
@@ -363,7 +392,11 @@ fun FuelTankCard(
             Divider(modifier = Modifier.padding(vertical = 2.dp))
 
             // Last Refill Timestamp & Edit Option
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     Text(if (lastRefill.timestamp.isNotBlank()) "${lastRefill.amount} L @ ${lastRefill.timestamp}" else "None", fontSize = 9.sp)
@@ -375,7 +408,20 @@ fun FuelTankCard(
 
             Divider(modifier = Modifier.padding(vertical = 2.dp))
 
-            Text("Current Stock: $currentStorage L", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            // Current Stock (Bold Font & Green Quantity)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Current Stock: ",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+                Text(
+                    text = "$currentStorage L",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2E7D32),
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 
@@ -477,7 +523,6 @@ fun NumberField(
     modifier: Modifier = Modifier,
     onValueChange: (Double) -> Unit
 ) {
-    // Retain user's actual typed text string locally to prevent formatting resets/cursor jumps
     var textValue by remember(value) {
         mutableStateOf(if (value == 0.0) "" else if (value % 1.0 == 0.0) value.toLong().toString() else value.toString())
     }
@@ -485,7 +530,6 @@ fun NumberField(
     OutlinedTextField(
         value = textValue,
         onValueChange = { input ->
-            // Allow empty input or valid numbers with up to one decimal point
             if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
                 textValue = input
                 val parsed = input.toDoubleOrNull() ?: 0.0
