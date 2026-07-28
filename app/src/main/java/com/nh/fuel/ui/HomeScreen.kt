@@ -1,5 +1,6 @@
 package com.nh.fuel.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,7 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -44,14 +47,40 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
+            // Transparent Floating Liquid Glass TopBar
             TopAppBar(
                 title = {
-                    Column {
-                        Text("NH FUEL STATION", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(currentTimeString, fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 12.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White.copy(alpha = 0.25f))
+                            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "NH FUEL STATION",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp,
+                                letterSpacing = 1.2.sp,
+                                fontFamily = FontFamily.SansSerif,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = currentTimeString,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                )
             )
         },
         bottomBar = {
@@ -62,7 +91,8 @@ fun HomeScreen(
                 NavigationBarItem(selected = false, onClick = {}, label = { Text("Expend") }, icon = {})
                 NavigationBarItem(selected = false, onClick = {}, label = { Text("Setting") }, icon = {})
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(
             modifier = Modifier
@@ -283,16 +313,36 @@ fun HomeScreen(
                         // Shift 1 Sales
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Shift 1", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("• Petrol: ${record.shift1.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
-                            Text("• Diesel: ${record.shift1.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                            Text(
+                                text = "• Petrol: ${record.shift1.petrolSale} L",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFC62828),
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "• Diesel: ${record.shift1.dieselSale} L",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1565C0),
+                                fontSize = 10.sp
+                            )
                         }
 
                         // Shift 2 Sales (Appears beside Shift 1 when active)
                         if (record.shift1.isComplete || record.shift2.petrolSale > 0.0 || record.shift2.dieselSale > 0.0) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Shift 2", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text("• Petrol: ${record.shift2.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
-                                Text("• Diesel: ${record.shift2.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                                Text(
+                                    text = "• Petrol: ${record.shift2.petrolSale} L",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFC62828),
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = "• Diesel: ${record.shift2.dieselSale} L",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1565C0),
+                                    fontSize = 10.sp
+                                )
                             }
                         }
 
@@ -300,8 +350,18 @@ fun HomeScreen(
                         if (record.shift2.isComplete || record.shift3.petrolSale > 0.0 || record.shift3.dieselSale > 0.0) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Shift 3", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text("• Petrol: ${record.shift3.petrolSale} L", color = Color(0xFFC62828), fontSize = 10.sp)
-                                Text("• Diesel: ${record.shift3.dieselSale} L", color = Color(0xFF1565C0), fontSize = 10.sp)
+                                Text(
+                                    text = "• Petrol: ${record.shift3.petrolSale} L",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFC62828),
+                                    fontSize = 10.sp
+                                )
+                                Text(
+                                    text = "• Diesel: ${record.shift3.dieselSale} L",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1565C0),
+                                    fontSize = 10.sp
+                                )
                             }
                         }
                     }
@@ -408,18 +468,18 @@ fun FuelTankCard(
 
             Divider(modifier = Modifier.padding(vertical = 2.dp))
 
-            // Current Stock (Bold Font & Green Quantity)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Current Stock (Bold Font & Size 22 Green Quantity)
+            Column {
                 Text(
-                    text = "Current Stock: ",
+                    text = "Current Stock:",
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
                 )
                 Text(
                     text = "$currentStorage L",
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFF2E7D32),
-                    fontSize = 11.sp
+                    fontSize = 22.sp
                 )
             }
         }
