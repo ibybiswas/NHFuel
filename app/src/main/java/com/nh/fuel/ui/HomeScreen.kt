@@ -2,6 +2,7 @@ package com.nh.fuel.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -56,13 +57,13 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Edge-to-Edge Content Layer
+        // 1. Edge-to-Edge Scrollable Content (Extends completely behind status & navigation bars)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 66.dp
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 54.dp,
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 68.dp
                 )
         ) {
             when (selectedMainTab) {
@@ -83,21 +84,21 @@ fun MainContainerScreen(
             }
         }
 
-        // 2. Liquid Glass Header Overlay with Theme Dropdown
+        // 2. Liquid Glass Floating Header Overlay
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
                 .align(Alignment.TopCenter)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
-                    .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -117,10 +118,11 @@ fun MainContainerScreen(
                             text = currentTimeString,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
+                    // Header Theme Dropdown Icon Button
                     Box {
                         IconButton(
                             onClick = { showThemeMenu = true },
@@ -191,22 +193,22 @@ fun MainContainerScreen(
             }
         }
 
-        // 3. Perfectly Aligned Liquid Glass Floating Bottom Navbar Pill
+        // 3. Floating Glass Bottom Navigation Bar Pill (No Extra Padding, True Opacity Control)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(bottom = 6.dp, start = 12.dp, end = 12.dp)
                 .align(Alignment.BottomCenter)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
-                    .shadow( elevation = 8.dp, shape = CircleShape)
+                    .shadow(elevation = 8.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f), CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), CircleShape)
             ) {
                 NavigationBar(
                     containerColor = Color.Transparent,
@@ -219,7 +221,7 @@ fun MainContainerScreen(
                         selectedTextColor = MaterialTheme.colorScheme.primary,
                         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        indicatorColor = Color.Transparent // Removes standard bulky M3 selection oval
+                        indicatorColor = Color.Transparent
                     )
 
                     NavigationBarItem(
@@ -273,10 +275,15 @@ fun HomeScreenContent(
     var selectedShiftTab by remember { mutableStateOf(1) }
     var showDatePicker by remember { mutableStateOf(false) }
 
+    val isDark = isSystemInDarkTheme()
+    val petrolColor = if (isDark) Color(0xFFFF8A80) else Color(0xFFC62828)
+    val dieselColor = if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
+    val stockColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -286,11 +293,25 @@ fun HomeScreenContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Selected Date: ", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(record.date, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "Selected Date: ",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = record.date,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
             IconButton(onClick = { showDatePicker = true }) {
-                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Date")
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit Date",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
         }
 
@@ -298,7 +319,7 @@ fun HomeScreenContent(
             var inputDate by remember { mutableStateOf(record.date) }
             AlertDialog(
                 onDismissRequest = { showDatePicker = false },
-                title = { Text("Select Date (YYYY-MM-DD)") },
+                title = { Text("Select Date (YYYY-MM-DD)", color = MaterialTheme.colorScheme.onSurface) },
                 text = {
                     OutlinedTextField(
                         value = inputDate,
@@ -311,9 +332,7 @@ fun HomeScreenContent(
                     TextButton(onClick = {
                         showDatePicker = false
                         if (inputDate.isNotBlank()) onDateSelected(inputDate)
-                    }) {
-                        Text("Load Date")
-                    }
+                    }) { Text("Load Date") }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
@@ -321,11 +340,13 @@ fun HomeScreenContent(
             )
         }
 
+        // Tank Storage Cards
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Petrol Tank Storage",
-                color = Color(0xFFC62828),
+                color = petrolColor,
+                stockColor = stockColor,
                 initialStock = record.petrolTotal,
                 cumulativeRefill = record.petrolRefill,
                 cumulativeShortage = record.petrolShortage,
@@ -352,7 +373,8 @@ fun HomeScreenContent(
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Diesel Tank Storage",
-                color = Color(0xFF1565C0),
+                color = dieselColor,
+                stockColor = stockColor,
                 initialStock = record.dieselTotal,
                 cumulativeRefill = record.dieselRefill,
                 cumulativeShortage = record.dieselShortage,
@@ -406,6 +428,8 @@ fun HomeScreenContent(
         ShiftInputBlock(
             shiftTitle = "Shift $selectedShiftTab Readings",
             shift = activeShift,
+            petrolColor = petrolColor,
+            dieselColor = dieselColor,
             onShiftUpdated = { updatedShift ->
                 val newRecord = when (selectedShiftTab) {
                     1 -> {
@@ -470,43 +494,50 @@ fun HomeScreenContent(
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier.fillMaxWidth().border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Shift Sales Breakdown:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(
+                    text = "Shift Sales Breakdown:",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Shift 1", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("• Petrol: ${record.shift1.petrolSale} L", fontWeight = FontWeight.Bold, color = Color(0xFFC62828), fontSize = 10.sp)
-                        Text("• Diesel: ${record.shift1.dieselSale} L", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0), fontSize = 10.sp)
+                        Text("Shift 1", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Text("• Petrol: ${record.shift1.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                        Text("• Diesel: ${record.shift1.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                     }
 
                     if (record.shift1.isComplete || record.shift2.petrolSale > 0.0 || record.shift2.dieselSale > 0.0) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Shift 2", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("• Petrol: ${record.shift2.petrolSale} L", fontWeight = FontWeight.Bold, color = Color(0xFFC62828), fontSize = 10.sp)
-                            Text("• Diesel: ${record.shift2.dieselSale} L", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0), fontSize = 10.sp)
+                            Text("Shift 2", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text("• Petrol: ${record.shift2.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                            Text("• Diesel: ${record.shift2.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                         }
                     }
 
                     if (record.shift2.isComplete || record.shift3.petrolSale > 0.0 || record.shift3.dieselSale > 0.0) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Shift 3", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("• Petrol: ${record.shift3.petrolSale} L", fontWeight = FontWeight.Bold, color = Color(0xFFC62828), fontSize = 10.sp)
-                            Text("• Diesel: ${record.shift3.dieselSale} L", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0), fontSize = 10.sp)
+                            Text("Shift 3", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text("• Petrol: ${record.shift3.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                            Text("• Diesel: ${record.shift3.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                         }
                     }
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-                Text("Total 24H Full Day Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text("• Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFFB71C1C), fontSize = 13.sp)
-                Text("• Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = Color(0xFF0D47A1), fontSize = 13.sp)
+                Text("Total 24H Full Day Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("• Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 13.sp)
+                Text("• Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 13.sp)
             }
         }
     }
@@ -518,7 +549,7 @@ fun PlaceholderTab(title: String) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Gray)
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
     }
 }
 
@@ -527,6 +558,7 @@ fun FuelTankCard(
     modifier: Modifier = Modifier,
     title: String,
     color: Color,
+    stockColor: Color,
     initialStock: Double,
     cumulativeRefill: Double,
     cumulativeShortage: Double,
@@ -541,7 +573,10 @@ fun FuelTankCard(
     var newShortageInput by remember { mutableStateOf("") }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
-    Card(modifier = modifier.border(1.dp, Color.Gray, RoundedCornerShape(8.dp))) {
+    Card(
+        modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
@@ -567,7 +602,7 @@ fun FuelTankCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) { Text("+", fontSize = 12.sp) }
             }
-            Text("Total Refilled: $cumulativeRefill L", fontSize = 10.sp, color = Color(0xFF2E7D32))
+            Text("Total Refilled: $cumulativeRefill L", fontSize = 10.sp, color = stockColor)
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
@@ -590,9 +625,9 @@ fun FuelTankCard(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) { Text("-", fontSize = 12.sp) }
             }
-            Text("Total Shortage: $cumulativeShortage L", fontSize = 10.sp, color = Color(0xFFC62828))
+            Text("Total Shortage: $cumulativeShortage L", fontSize = 10.sp, color = Color(0xFFFF5252))
 
-            Divider(modifier = Modifier.padding(vertical = 2.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -600,22 +635,31 @@ fun FuelTankCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp)
-                    Text(if (lastRefill.timestamp.isNotBlank()) "${lastRefill.amount} L @ ${lastRefill.timestamp}" else "None", fontSize = 9.sp)
+                    Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        text = if (lastRefill.timestamp.isNotBlank()) "${lastRefill.amount} L @ ${lastRefill.timestamp}" else "None",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 IconButton(onClick = { showEditLastRefillDialog = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Last Refill", modifier = Modifier.size(14.dp))
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Last Refill",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
 
-            Divider(modifier = Modifier.padding(vertical = 2.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             Column {
-                Text("Current Stock:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text("Current Stock:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     text = "$currentStorage L",
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF2E7D32),
+                    color = stockColor,
                     fontSize = 22.sp
                 )
             }
@@ -628,7 +672,7 @@ fun FuelTankCard(
 
         AlertDialog(
             onDismissRequest = { showEditLastRefillDialog = false },
-            title = { Text("Edit Last Refill Details", fontSize = 14.sp) },
+            title = { Text("Edit Last Refill Details", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = editAmount, onValueChange = { editAmount = it }, label = { Text("Refill Litre") })
@@ -652,16 +696,18 @@ fun FuelTankCard(
 fun ShiftInputBlock(
     shiftTitle: String,
     shift: DayShift,
+    petrolColor: Color,
+    dieselColor: Color,
     onShiftUpdated: (DayShift) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(shiftTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(shiftTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
 
-        DispenserShiftCard("MPD 1", shift.mpd1) { updatedMpd1 ->
+        DispenserShiftCard("MPD 1", shift.mpd1, petrolColor, dieselColor) { updatedMpd1 ->
             onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
         }
 
-        DispenserShiftCard("MPD 2", shift.mpd2) { updatedMpd2 ->
+        DispenserShiftCard("MPD 2", shift.mpd2, petrolColor, dieselColor) { updatedMpd2 ->
             onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
         }
     }
@@ -671,20 +717,27 @@ fun ShiftInputBlock(
 fun DispenserShiftCard(
     dispenserTitle: String,
     dispenser: DispenserShift,
+    petrolColor: Color,
+    dieselColor: Color,
     onUpdate: (DispenserShift) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(dispenserTitle, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(dispenserTitle, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Petrol (N2, N3)", fontWeight = FontWeight.Bold, color = Color(0xFFC62828), fontSize = 11.sp)
+                    Text("Petrol (N2, N3)", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 11.sp)
                     NozzleRow("N2", dispenser.petrolN2) { updated -> onUpdate(dispenser.copy(petrolN2 = updated)) }
                     NozzleRow("N3", dispenser.petrolN3) { updated -> onUpdate(dispenser.copy(petrolN3 = updated)) }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Diesel (N1, N4)", fontWeight = FontWeight.Bold, color = Color(0xFF1565C0), fontSize = 11.sp)
+                    Text("Diesel (N1, N4)", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 11.sp)
                     NozzleRow("N1", dispenser.dieselN1) { updated -> onUpdate(dispenser.copy(dieselN1 = updated)) }
                     NozzleRow("N4", dispenser.dieselN4) { updated -> onUpdate(dispenser.copy(dieselN4 = updated)) }
                 }
@@ -704,7 +757,7 @@ fun NozzleRow(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.padding(vertical = 2.dp)
     ) {
-        Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
         NumberField("Open", nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
         NumberField("Close", nozzle.close, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
     }
@@ -733,6 +786,12 @@ fun NumberField(
         label = { Text(label, fontSize = 8.sp) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+        ),
         modifier = modifier
     )
 }
