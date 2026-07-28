@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -55,13 +56,13 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Edge-to-Edge Scrollable Layer (Passes underneath transparent Status & Navigation Bars)
+        // 1. Edge-to-Edge Content Layer
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
                     top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 58.dp
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 66.dp
                 )
         ) {
             when (selectedMainTab) {
@@ -82,7 +83,7 @@ fun MainContainerScreen(
             }
         }
 
-        // 2. Liquid Glass Header Overlay with Integrated Theme Switcher Dropdown
+        // 2. Liquid Glass Header Overlay with Theme Dropdown
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,7 +95,7 @@ fun MainContainerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
                     .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
@@ -120,7 +121,6 @@ fun MainContainerScreen(
                         )
                     }
 
-                    // Header Theme Dropdown Button
                     Box {
                         IconButton(
                             onClick = { showThemeMenu = true },
@@ -191,54 +191,73 @@ fun MainContainerScreen(
             }
         }
 
-        // 3. Floating Glass Navigation Bar Pill (Hugs edge without outer bottom background padding)
+        // 3. Perfectly Aligned Liquid Glass Floating Bottom Navbar Pill
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 2.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
                 .align(Alignment.BottomCenter)
         ) {
-            NavigationBar(
+            Box(
                 modifier = Modifier
-                    .height(56.dp)
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .shadow( elevation = 8.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), CircleShape),
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f), CircleShape)
             ) {
-                NavigationBarItem(
-                    selected = selectedMainTab == 0,
-                    onClick = { selectedMainTab = 0 },
-                    label = { Text("Home", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home", modifier = Modifier.size(20.dp)) }
-                )
-                NavigationBarItem(
-                    selected = selectedMainTab == 1,
-                    onClick = { selectedMainTab = 1 },
-                    label = { Text("Sell", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell", modifier = Modifier.size(20.dp)) }
-                )
-                NavigationBarItem(
-                    selected = selectedMainTab == 2,
-                    onClick = { selectedMainTab = 2 },
-                    label = { Text("Report", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Assessment, contentDescription = "Report", modifier = Modifier.size(20.dp)) }
-                )
-                NavigationBarItem(
-                    selected = selectedMainTab == 3,
-                    onClick = { selectedMainTab = 3 },
-                    label = { Text("Expend", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend", modifier = Modifier.size(20.dp)) }
-                )
-                NavigationBarItem(
-                    selected = selectedMainTab == 4,
-                    onClick = { selectedMainTab = 4 },
-                    label = { Text("Setting", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Setting", modifier = Modifier.size(20.dp)) }
-                )
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.fillMaxSize(),
+                    windowInsets = WindowInsets(0, 0, 0, 0)
+                ) {
+                    val itemColors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = Color.Transparent // Removes standard bulky M3 selection oval
+                    )
+
+                    NavigationBarItem(
+                        selected = selectedMainTab == 0,
+                        onClick = { selectedMainTab = 0 },
+                        label = { Text("Home", fontSize = 10.sp, fontWeight = if (selectedMainTab == 0) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Home", modifier = Modifier.size(20.dp)) },
+                        colors = itemColors
+                    )
+                    NavigationBarItem(
+                        selected = selectedMainTab == 1,
+                        onClick = { selectedMainTab = 1 },
+                        label = { Text("Sell", fontSize = 10.sp, fontWeight = if (selectedMainTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell", modifier = Modifier.size(20.dp)) },
+                        colors = itemColors
+                    )
+                    NavigationBarItem(
+                        selected = selectedMainTab == 2,
+                        onClick = { selectedMainTab = 2 },
+                        label = { Text("Report", fontSize = 10.sp, fontWeight = if (selectedMainTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.Assessment, contentDescription = "Report", modifier = Modifier.size(20.dp)) },
+                        colors = itemColors
+                    )
+                    NavigationBarItem(
+                        selected = selectedMainTab == 3,
+                        onClick = { selectedMainTab = 3 },
+                        label = { Text("Expend", fontSize = 10.sp, fontWeight = if (selectedMainTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend", modifier = Modifier.size(20.dp)) },
+                        colors = itemColors
+                    )
+                    NavigationBarItem(
+                        selected = selectedMainTab == 4,
+                        onClick = { selectedMainTab = 4 },
+                        label = { Text("Setting", fontSize = 10.sp, fontWeight = if (selectedMainTab == 4) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Setting", modifier = Modifier.size(20.dp)) },
+                        colors = itemColors
+                    )
+                }
             }
         }
     }
