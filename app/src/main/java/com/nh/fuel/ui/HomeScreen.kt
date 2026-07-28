@@ -32,14 +32,16 @@ import java.util.Locale
 fun MainContainerScreen(
     record: DailyFuelRecord,
     navBarOpacity: Float,
+    themeMode: ThemeMode,
     onRecordChanged: (DailyFuelRecord) -> Unit,
     onDateSelected: (String) -> Unit,
-    onOpacityChanged: (Float) -> Unit
+    onOpacityChanged: (Float) -> Unit,
+    onThemeModeChanged: (ThemeMode) -> Unit
 ) {
     var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
 
-    // Live Clock
+    // Live Clock Engine
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("EEE, dd MMM yyyy | hh:mm:ss a", Locale.getDefault()).format(Date())
@@ -52,13 +54,13 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Scrollable Content Layer (Passes behind header & status bar)
+        // 1. Edge-to-Edge Scrollable Content Layer
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 48.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 62.dp
                 )
         ) {
             when (selectedMainTab) {
@@ -72,12 +74,14 @@ fun MainContainerScreen(
                 3 -> PlaceholderTab("Expenditure Tracker")
                 4 -> SettingsScreen(
                     currentOpacity = navBarOpacity,
-                    onOpacityChanged = onOpacityChanged
+                    currentThemeMode = themeMode,
+                    onOpacityChanged = onOpacityChanged,
+                    onThemeModeChanged = onThemeModeChanged
                 )
             }
         }
 
-        // 2. Liquid Glass Header Overlay (Status bar fully transparent, content visible underneath)
+        // 2. Liquid Glass Header Overlay (Zero Extra Padding around Status Bar)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -89,8 +93,8 @@ fun MainContainerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White.copy(alpha = 0.25f))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
+                    .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Column {
@@ -112,7 +116,7 @@ fun MainContainerScreen(
             }
         }
 
-        // 3. Floating Liquid Glass Bottom Navbar Pill (No outer padding)
+        // 3. Floating Glass Navigation Bar Pill
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,7 +129,7 @@ fun MainContainerScreen(
                     .height(58.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
-                    .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), CircleShape),
                 containerColor = Color.Transparent,
                 tonalElevation = 0.dp,
                 windowInsets = WindowInsets(0, 0, 0, 0)
@@ -189,7 +193,7 @@ fun HomeScreenContent(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Selected Date: ", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(record.date, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1565C0))
+                Text(record.date, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = { showDatePicker = true }) {
                 Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit Date")
