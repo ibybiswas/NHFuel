@@ -25,16 +25,17 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             FuelDatabase::class.java,
             "nh_fuel_db"
-        ).build()
-
-        val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        ).fallbackToDestructiveMigration().build()
 
         setContent {
             MaterialTheme {
                 val coroutineScope = rememberCoroutineScope()
-                val recordFlow = database.fuelDao().getRecordByDate(todayDate).collectAsState(initial = null)
+                var currentDate by remember {
+                    mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+                }
 
-                val currentRecord = recordFlow.value ?: DailyFuelRecord(date = todayDate)
+                val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
+                val currentRecord = recordFlow.value ?: DailyFuelRecord(date = currentDate)
 
                 HomeScreen(
                     record = currentRecord,
@@ -42,6 +43,9 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             database.fuelDao().insertOrUpdate(updatedRecord)
                         }
+                    },
+                    onDateSelected = { selectedDate ->
+                        currentDate = selectedDate
                     }
                 )
             }
