@@ -4,7 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [DailyFuelRecord::class], version = 2, exportSchema = false)
+@Database(entities = [DailyFuelRecord::class], version = 3, exportSchema = false)
 @TypeConverters(FuelConverters::class)
 abstract class FuelDatabase : RoomDatabase() {
     abstract fun fuelDao(): FuelDao
