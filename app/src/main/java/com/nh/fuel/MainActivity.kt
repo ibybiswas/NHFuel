@@ -41,7 +41,9 @@ class MainActivity : ComponentActivity() {
                 val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
                 val currentRecord = recordFlow.value ?: DailyFuelRecord(date = currentDate)
 
-                val navBarOpacity by navBarPreferences.opacityFlow.collectAsState(initial = 0.85f)
+                val navBarOpacity by navBarPreferences.opacityFlow.collectAsState(
+                    initial = NavBarPreferences.DEFAULT_GLASS_OPACITY
+                )
 
                 MainContainerScreen(
                     record = currentRecord,
