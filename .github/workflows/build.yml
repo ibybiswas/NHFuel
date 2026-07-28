@@ -1,7 +1,10 @@
-name: Manual Signed Android APK Build
+name: Manual Release Android APK Build
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,6 +25,19 @@ jobs:
       with:
         gradle-version: 8.2
 
+    - name: Extract App Version from build.gradle.kts
+      id: get_version
+      run: |
+        VERSION_NAME=$(grep -E 'versionName\s*=\s*"[^"]+"' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+        VERSION_CODE=$(grep -E 'versionCode\s*=\s*[0-9]+' app/build.gradle.kts | head -1 | sed -E 's/.*=\s*([0-9]+).*/\1/')
+        
+        if [ -z "$VERSION_NAME" ]; then VERSION_NAME="1.0.0"; fi
+        if [ -z "$VERSION_CODE" ]; then VERSION_CODE="1"; fi
+
+        echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+        echo "tag_name=v$VERSION_NAME" >> $GITHUB_OUTPUT
+
     - name: Decode Keystore from Secret
       run: |
         echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
@@ -36,8 +52,23 @@ jobs:
         chmod +x gradlew
         ./gradlew assembleRelease --stacktrace
 
-    - name: Upload Signed APK Artifact
-      uses: actions/upload-artifact@v4
+    - name: Prepare APK Asset
+      run: |
+        mkdir -p release_assets
+        cp app/build/outputs/apk/release/app-release.apk release_assets/NHFuel-v${{ steps.get_version.outputs.version_name }}.apk
+
+    - name: Create or Update GitHub Release
+      uses: softprops/action-gh-release@v1
       with:
-        name: NHFuel-Signed-Release-APK
-        path: app/build/outputs/apk/release/app-release.apk
+        tag_name: ${{ steps.get_version.outputs.tag_name }}
+        name: NH Fuel ${{ steps.get_version.outputs.tag_name }}
+        body: |
+          ### NH Fuel Release ${{ steps.get_version.outputs.tag_name }}
+          * **Version Code**: ${{ steps.get_version.outputs.version_code }}
+          * **Package Name**: `com.nh.fuel`
+          * **Built On**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+        files: release_assets/NHFuel-v${{ steps.get_version.outputs.version_name }}.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
