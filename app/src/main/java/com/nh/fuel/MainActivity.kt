@@ -35,8 +35,14 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.transparent(),
-            navigationBarStyle = SystemBarStyle.transparent()
+            statusBarStyle = SystemBarStyle.auto(
+                Color.TRANSPARENT,
+                Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                Color.TRANSPARENT,
+                Color.TRANSPARENT
+            )
         )
 
         database = Room.databaseBuilder(
