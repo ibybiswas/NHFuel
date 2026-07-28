@@ -477,9 +477,21 @@ fun NumberField(
     modifier: Modifier = Modifier,
     onValueChange: (Double) -> Unit
 ) {
+    // Retain user's actual typed text string locally to prevent formatting resets/cursor jumps
+    var textValue by remember(value) {
+        mutableStateOf(if (value == 0.0) "" else if (value % 1.0 == 0.0) value.toLong().toString() else value.toString())
+    }
+
     OutlinedTextField(
-        value = if (value == 0.0) "" else value.toString(),
-        onValueChange = { onValueChange(it.toDoubleOrNull() ?: 0.0) },
+        value = textValue,
+        onValueChange = { input ->
+            // Allow empty input or valid numbers with up to one decimal point
+            if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                textValue = input
+                val parsed = input.toDoubleOrNull() ?: 0.0
+                onValueChange(parsed)
+            }
+        },
         label = { Text(label, fontSize = 8.sp) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
