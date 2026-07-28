@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -38,7 +39,7 @@ fun MainContainerScreen(
     var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
 
-    // Live Clock Engine
+    // Live Clock
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("EEE, dd MMM yyyy | hh:mm:ss a", Locale.getDefault()).format(Date())
@@ -46,14 +47,18 @@ fun MainContainerScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Content Layer - Scrolls Edge-to-Edge behind top & bottom bars
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // 1. Scrollable Content Layer (Passes behind header & status bar)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 68.dp
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 48.dp,
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp
                 )
         ) {
             when (selectedMainTab) {
@@ -72,27 +77,27 @@ fun MainContainerScreen(
             }
         }
 
-        // Floating Liquid Glass Header (Zero Extra Padding, Hugs Status Bar)
+        // 2. Liquid Glass Header Overlay (Status bar fully transparent, content visible underneath)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 8.dp, vertical = 2.dp)
                 .align(Alignment.TopCenter)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(Color.White.copy(alpha = 0.25f))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Column {
                     Text(
                         text = "NH FUEL STATION",
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         letterSpacing = 1.1.sp,
                         fontFamily = FontFamily.SansSerif,
                         color = MaterialTheme.colorScheme.primary
@@ -107,52 +112,53 @@ fun MainContainerScreen(
             }
         }
 
-        // Floating Liquid Glass Navigation Bar (Hugs Bottom Navigation Bar)
+        // 3. Floating Liquid Glass Bottom Navbar Pill (No outer padding)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
                 .align(Alignment.BottomCenter)
         ) {
             NavigationBar(
                 modifier = Modifier
-                    .height(60.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .height(58.dp)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
-                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(24.dp)),
+                    .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape),
                 containerColor = Color.Transparent,
-                tonalElevation = 0.dp
+                tonalElevation = 0.dp,
+                windowInsets = WindowInsets(0, 0, 0, 0)
             ) {
                 NavigationBarItem(
                     selected = selectedMainTab == 0,
                     onClick = { selectedMainTab = 0 },
                     label = { Text("Home", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") }
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home", modifier = Modifier.size(20.dp)) }
                 )
                 NavigationBarItem(
                     selected = selectedMainTab == 1,
                     onClick = { selectedMainTab = 1 },
                     label = { Text("Sell", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell") }
+                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell", modifier = Modifier.size(20.dp)) }
                 )
                 NavigationBarItem(
                     selected = selectedMainTab == 2,
                     onClick = { selectedMainTab = 2 },
                     label = { Text("Report", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Assessment, contentDescription = "Report") }
+                    icon = { Icon(Icons.Default.Assessment, contentDescription = "Report", modifier = Modifier.size(20.dp)) }
                 )
                 NavigationBarItem(
                     selected = selectedMainTab == 3,
                     onClick = { selectedMainTab = 3 },
                     label = { Text("Expend", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend") }
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend", modifier = Modifier.size(20.dp)) }
                 )
                 NavigationBarItem(
                     selected = selectedMainTab == 4,
                     onClick = { selectedMainTab = 4 },
                     label = { Text("Setting", fontSize = 10.sp) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Setting") }
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Setting", modifier = Modifier.size(20.dp)) }
                 )
             }
         }
@@ -172,7 +178,7 @@ fun HomeScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp, vertical = 2.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
