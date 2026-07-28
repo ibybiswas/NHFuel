@@ -1,13 +1,7 @@
 package com.nh.fuel.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,10 +35,10 @@ fun MainContainerScreen(
     onDateSelected: (String) -> Unit,
     onOpacityChanged: (Float) -> Unit
 ) {
-    var selectedMainTab by remember { mutableStateOf(0) } // 0: Home, 1: Sell, 2: Report, 3: Expend, 4: Setting
+    var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
 
-    // Live Clock
+    // Live Clock Engine
     LaunchedEffect(Unit) {
         while (true) {
             currentTimeString = SimpleDateFormat("EEE, dd MMM yyyy | hh:mm:ss a", Locale.getDefault()).format(Date())
@@ -53,23 +46,16 @@ fun MainContainerScreen(
         }
     }
 
-    Scaffold(
-        // Let the header/nav glass sit flush against the status/nav bars
-        // instead of Scaffold reserving an opaque strip behind them.
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            NHFuelHeader(currentTimeString = currentTimeString)
-        },
-        bottomBar = {
-            NHFuelBottomNav(
-                selectedIndex = selectedMainTab,
-                glassOpacity = navBarOpacity,
-                onTabSelected = { selectedMainTab = it }
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Content Layer - Scrolls Edge-to-Edge behind top & bottom bars
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 52.dp,
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 68.dp
+                )
+        ) {
             when (selectedMainTab) {
                 0 -> HomeScreenContent(
                     record = record,
@@ -85,179 +71,92 @@ fun MainContainerScreen(
                 )
             }
         }
-    }
-}
 
-/**
- * Compact liquid-glass header: station name + live clock in a single tight
- * row, with a flat translucent glass background that extends up under the
- * status bar — matching ScanApp's header (see SettingsTopBar there) instead
- * of the taller, more heavily padded default Material3 TopAppBar.
- */
-@Composable
-private fun NHFuelHeader(currentTimeString: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .cleanGlassBackground(
-                tint = MaterialTheme.colorScheme.surfaceContainer,
-                opacity = HEADER_GLASS_OPACITY
-            )
-    ) {
-        Column(
+        // Floating Liquid Glass Header (Zero Extra Padding, Hugs Status Bar)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .align(Alignment.TopCenter)
         ) {
-            Text(
-                text = "NH FUEL STATION",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 17.sp,
-                letterSpacing = 1.1.sp,
-                fontFamily = FontFamily.SansSerif,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = currentTimeString,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-            )
-        }
-    }
-}
-
-/** Opacity of the header's glass background — fixed, not user-tunable (only the bottom nav's opacity is). */
-private const val HEADER_GLASS_OPACITY = 0.6f
-
-/**
- * Floating liquid-glass bottom navigation bar, styled after ScanApp's
- * ScanAppBottomNav: a flat translucent tint at a user-controlled
- * [glassOpacity] (persisted via [NavBarPreferences]), a thin hairline
- * border, and items hand-built as a centered icon+label column so they stay
- * dead-center in the bar regardless of its height — rather than the default
- * NavigationBarItem's fixed internal padding.
- */
-@Composable
-private fun NHFuelBottomNav(
-    selectedIndex: Int,
-    glassOpacity: Float,
-    onTabSelected: (Int) -> Unit
-) {
-    val items = listOf(
-        Triple("Home", Icons.Default.Home, 0),
-        Triple("Sell", Icons.Default.ShoppingCart, 1),
-        Triple("Report", Icons.Default.Assessment, 2),
-        Triple("Expend", Icons.Default.AccountBalanceWallet, 3),
-        Triple("Setting", Icons.Default.Settings, 4)
-    )
-    val shape = RoundedCornerShape(28.dp)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .height(68.dp)
-            .clip(shape)
-            .cleanGlassBackground(
-                tint = MaterialTheme.colorScheme.surfaceContainer,
-                opacity = glassOpacity
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = shape
-            )
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 8.dp)
-        ) {
-            val slotWidth = maxWidth / items.size
-            val indicatorOffset by animateDpAsState(
-                targetValue = slotWidth * selectedIndex,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "navIndicatorOffset"
-            )
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(slotWidth)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
-            )
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.25f))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "NH FUEL STATION",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 17.sp,
+                        letterSpacing = 1.1.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = currentTimeString,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                    )
+                }
+            }
         }
 
-        Row(modifier = Modifier.fillMaxSize()) {
-            items.forEach { (label, icon, index) ->
-                NHFuelBottomNavItem(
-                    icon = icon,
-                    label = label,
-                    selected = selectedIndex == index,
-                    onClick = { onTabSelected(index) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+        // Floating Liquid Glass Navigation Bar (Hugs Bottom Navigation Bar)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .align(Alignment.BottomCenter)
+        ) {
+            NavigationBar(
+                modifier = Modifier
+                    .height(60.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
+                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(24.dp)),
+                containerColor = Color.Transparent,
+                tonalElevation = 0.dp
+            ) {
+                NavigationBarItem(
+                    selected = selectedMainTab == 0,
+                    onClick = { selectedMainTab = 0 },
+                    label = { Text("Home", fontSize = 10.sp) },
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") }
+                )
+                NavigationBarItem(
+                    selected = selectedMainTab == 1,
+                    onClick = { selectedMainTab = 1 },
+                    label = { Text("Sell", fontSize = 10.sp) },
+                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell") }
+                )
+                NavigationBarItem(
+                    selected = selectedMainTab == 2,
+                    onClick = { selectedMainTab = 2 },
+                    label = { Text("Report", fontSize = 10.sp) },
+                    icon = { Icon(Icons.Default.Assessment, contentDescription = "Report") }
+                )
+                NavigationBarItem(
+                    selected = selectedMainTab == 3,
+                    onClick = { selectedMainTab = 3 },
+                    label = { Text("Expend", fontSize = 10.sp) },
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend") }
+                )
+                NavigationBarItem(
+                    selected = selectedMainTab == 4,
+                    onClick = { selectedMainTab = 4 },
+                    label = { Text("Setting", fontSize = 10.sp) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Setting") }
                 )
             }
         }
     }
-}
-
-/** One tab: icon above label, both centered in the slot it's given. */
-@Composable
-private fun NHFuelBottomNavItem(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "navItemColor"
-    )
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(2.dp))
-        Text(label, color = contentColor, fontSize = 10.sp, maxLines = 1)
-    }
-}
-
-/**
- * Flat translucent tint used for every "liquid glass" surface in the app
- * (the header, the bottom nav): just the theme's container color at a
- * caller-chosen alpha. [opacity] is clamped to [NavBarPreferences]'s
- * allowed range so callers can pass a raw slider value straight through.
- */
-internal fun Modifier.cleanGlassBackground(tint: Color, opacity: Float): Modifier {
-    val clamped = opacity.coerceIn(
-        NavBarPreferences.MIN_GLASS_OPACITY,
-        NavBarPreferences.MAX_GLASS_OPACITY
-    )
-    return this.background(tint.copy(alpha = clamped))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -273,11 +172,10 @@ fun HomeScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(12.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Date Header with Edit Pencil Icon
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -319,7 +217,6 @@ fun HomeScreenContent(
             )
         }
 
-        // Tank Storage Cards
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FuelTankCard(
                 modifier = Modifier.weight(1f),
@@ -376,7 +273,6 @@ fun HomeScreenContent(
             )
         }
 
-        // Shift Selector Tabs
         TabRow(selectedTabIndex = selectedShiftTab - 1) {
             Tab(
                 selected = selectedShiftTab == 1,
@@ -468,7 +364,6 @@ fun HomeScreenContent(
             }
         )
 
-        // Shift Sales Summary Card
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier.fillMaxWidth().border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
