@@ -3,6 +3,7 @@ package com.nh.fuel.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +33,7 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Bottom Navigation Opacity",
+                    text = "Bottom Navbar Glass Opacity",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp
                 )
@@ -42,22 +43,24 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Opacity Level", fontSize = 13.sp)
-                    Text("${(currentOpacity * 100).roundToInt()}%", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = currentOpacity,
+                        onValueChange = { onOpacityChanged(it) },
+                        valueRange = NavBarPreferences.MIN_GLASS_OPACITY..NavBarPreferences.MAX_GLASS_OPACITY,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "${(currentOpacity * 100).roundToInt()}%",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.widthIn(min = 36.dp)
+                    )
                 }
-
-                Slider(
-                    value = currentOpacity,
-                    onValueChange = { onOpacityChanged(it) },
-                    valueRange = 0.2f..1.0f,
-                    steps = 16
-                )
             }
         }
     }
