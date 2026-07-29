@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +83,7 @@ fun MainContainerScreen(
             }
         }
 
-        // Header Overlay
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -190,7 +191,7 @@ fun MainContainerScreen(
             }
         }
 
-        // Floating Bottom Navigation Bar
+        // Floating Bottom Navigation Pill
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -349,20 +350,18 @@ fun HomeScreenContent(
                 cumulativeShortage = record.petrolShortage,
                 currentStorage = record.currentPetrolStorage,
                 lastRefill = record.lastPetrolRefill,
-                onExactStockChange = { newDipReading ->
+                onConfirmExactStock = { confirmedVal, diff ->
+                    val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val isFirstEntry = record.petrolRefill == 0.0 && record.petrolShortage == 0.0 && record.totalPetrolSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(petrolTotal = newDipReading))
+                        onRecordChanged(record.copy(petrolTotal = clampedVal))
                     } else {
-                        val expectedStock = record.currentPetrolStorage
-                        val diff = newDipReading - expectedStock
-
                         if (diff > 100.0) {
                             onRecordChanged(
                                 record.copy(
-                                    petrolTotal = newDipReading,
+                                    petrolTotal = clampedVal,
                                     petrolRefill = record.petrolRefill + diff,
                                     lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr)
                                 )
@@ -371,32 +370,30 @@ fun HomeScreenContent(
                             val shortage = -diff
                             onRecordChanged(
                                 record.copy(
-                                    petrolTotal = newDipReading,
+                                    petrolTotal = clampedVal,
                                     petrolShortage = record.petrolShortage + shortage
                                 )
                             )
                         } else {
-                            onRecordChanged(record.copy(petrolTotal = newDipReading))
+                            onRecordChanged(record.copy(petrolTotal = clampedVal))
                         }
                     }
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newRefill = record.petrolRefill + addedLitre
-                    // Sync Exact Stock with the newly increased Current Stock
-                    val newCalculatedStock = (record.petrolTotal + addedLitre)
+                    val newRefill = record.petrolRefill + max(0.0, addedLitre)
+                    val newCalculatedStock = max(0.0, record.petrolTotal + addedLitre)
                     onRecordChanged(
                         record.copy(
                             petrolTotal = newCalculatedStock,
                             petrolRefill = newRefill,
-                            lastPetrolRefill = RefillEvent(amount = addedLitre, timestamp = nowStr)
+                            lastPetrolRefill = RefillEvent(amount = max(0.0, addedLitre), timestamp = nowStr)
                         )
                     )
                 },
                 onAddShortage = { addedShortage ->
-                    val newShortage = record.petrolShortage + addedShortage
-                    // Sync Exact Stock with the newly decreased Current Stock
-                    val newCalculatedStock = (record.petrolTotal - addedShortage)
+                    val newShortage = record.petrolShortage + max(0.0, addedShortage)
+                    val newCalculatedStock = max(0.0, record.petrolTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
                             petrolTotal = newCalculatedStock,
@@ -420,20 +417,18 @@ fun HomeScreenContent(
                 cumulativeShortage = record.dieselShortage,
                 currentStorage = record.currentDieselStorage,
                 lastRefill = record.lastDieselRefill,
-                onExactStockChange = { newDipReading ->
+                onConfirmExactStock = { confirmedVal, diff ->
+                    val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val isFirstEntry = record.dieselRefill == 0.0 && record.dieselShortage == 0.0 && record.totalDieselSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(dieselTotal = newDipReading))
+                        onRecordChanged(record.copy(dieselTotal = clampedVal))
                     } else {
-                        val expectedStock = record.currentDieselStorage
-                        val diff = newDipReading - expectedStock
-
                         if (diff > 100.0) {
                             onRecordChanged(
                                 record.copy(
-                                    dieselTotal = newDipReading,
+                                    dieselTotal = clampedVal,
                                     dieselRefill = record.dieselRefill + diff,
                                     lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr)
                                 )
@@ -442,32 +437,30 @@ fun HomeScreenContent(
                             val shortage = -diff
                             onRecordChanged(
                                 record.copy(
-                                    dieselTotal = newDipReading,
+                                    dieselTotal = clampedVal,
                                     dieselShortage = record.dieselShortage + shortage
                                 )
                             )
                         } else {
-                            onRecordChanged(record.copy(dieselTotal = newDipReading))
+                            onRecordChanged(record.copy(dieselTotal = clampedVal))
                         }
                     }
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newRefill = record.dieselRefill + addedLitre
-                    // Sync Exact Stock with the newly increased Current Stock
-                    val newCalculatedStock = (record.dieselTotal + addedLitre)
+                    val newRefill = record.dieselRefill + max(0.0, addedLitre)
+                    val newCalculatedStock = max(0.0, record.dieselTotal + addedLitre)
                     onRecordChanged(
                         record.copy(
                             dieselTotal = newCalculatedStock,
                             dieselRefill = newRefill,
-                            lastDieselRefill = RefillEvent(amount = addedLitre, timestamp = nowStr)
+                            lastDieselRefill = RefillEvent(amount = max(0.0, addedLitre), timestamp = nowStr)
                         )
                     )
                 },
                 onAddShortage = { addedShortage ->
-                    val newShortage = record.dieselShortage + addedShortage
-                    // Sync Exact Stock with the newly decreased Current Stock
-                    val newCalculatedStock = (record.dieselTotal - addedShortage)
+                    val newShortage = record.dieselShortage + max(0.0, addedShortage)
+                    val newCalculatedStock = max(0.0, record.dieselTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
                             dieselTotal = newCalculatedStock,
@@ -647,16 +640,19 @@ fun FuelTankCard(
     cumulativeShortage: Double,
     currentStorage: Double,
     lastRefill: RefillEvent,
-    onExactStockChange: (Double) -> Unit,
+    onConfirmExactStock: (Double, Double) -> Unit,
     onAddRefill: (Double) -> Unit,
     onAddShortage: (Double) -> Unit,
     onUpdateLastRefill: (RefillEvent) -> Unit
 ) {
+    var pendingExactStockInput by remember(exactStock) {
+        mutableStateOf(if (exactStock == 0.0) "" else if (exactStock % 1.0 == 0.0) exactStock.toLong().toString() else exactStock.toString())
+    }
     var newRefillInput by remember { mutableStateOf("") }
     var newShortageInput by remember { mutableStateOf("") }
-    var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
-    val displayedExactStock = if (exactStock > 0.0) exactStock else currentStorage
+    var showConfirmationDialog by remember { mutableStateOf(false) }
+    var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
@@ -665,29 +661,45 @@ fun FuelTankCard(
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
-            // Half-Length Exact Stock Field with Pencil Icon
+            // Exact Stock Box + Check Save Button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                NumberField(
-                    label = "Exact Stock",
-                    value = displayedExactStock,
+                OutlinedTextField(
+                    value = pendingExactStockInput,
+                    onValueChange = { input ->
+                        if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                            pendingExactStockInput = input
+                        }
+                    },
+                    label = { Text("Exact Stock", fontSize = 8.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    ),
                     modifier = Modifier.weight(0.75f)
-                ) { inputVal ->
-                    onExactStockChange(inputVal)
-                }
+                )
 
                 IconButton(
-                    onClick = { onExactStockChange(displayedExactStock) },
+                    onClick = {
+                        val parsed = max(0.0, pendingExactStockInput.toDoubleOrNull() ?: 0.0)
+                        if (parsed >= 0.0) {
+                            showConfirmationDialog = true
+                        }
+                    },
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Tank Dip",
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Save Dip Reading",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -776,6 +788,63 @@ fun FuelTankCard(
         }
     }
 
+    if (showConfirmationDialog) {
+        val targetVal = max(0.0, pendingExactStockInput.toDoubleOrNull() ?: currentStorage)
+        val diff = targetVal - currentStorage
+
+        AlertDialog(
+            onDismissRequest = { showConfirmationDialog = false },
+            title = { Text("Confirm Tank Dip Reading", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Entered Dip Reading: $targetVal Litres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Expected Current Stock: $currentStorage Litres", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    if (diff > 100.0) {
+                        Text(
+                            text = "Detected Refill Delivery: +${diff} Litres",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32),
+                            fontSize = 12.sp
+                        )
+                    } else if (diff < 0.0) {
+                        Text(
+                            text = "Detected Shortage / Dip Loss: -${-diff} Litres",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFC62828),
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "No change detected in tank storage.",
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Current Stock will be synced to $targetVal Litres.",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmationDialog = false
+                        onConfirmExactStock(targetVal, diff)
+                    }
+                ) { Text("Confirm & Sync", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmationDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showEditLastRefillDialog) {
         var editAmount by remember { mutableStateOf(lastRefill.amount.toString()) }
         var editTime by remember { mutableStateOf(lastRefill.timestamp) }
@@ -792,7 +861,7 @@ fun FuelTankCard(
             confirmButton = {
                 TextButton(onClick = {
                     showEditLastRefillDialog = false
-                    onUpdateLastRefill(RefillEvent(amount = editAmount.toDoubleOrNull() ?: 0.0, timestamp = editTime))
+                    onUpdateLastRefill(RefillEvent(amount = max(0.0, editAmount.toDoubleOrNull() ?: 0.0), timestamp = editTime))
                 }) { Text("Save") }
             },
             dismissButton = {
@@ -868,8 +937,8 @@ fun NozzleRow(
         modifier = Modifier.padding(vertical = 2.dp)
     ) {
         Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
-        NumberField("Open", nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
-        NumberField("Close", nozzle.close, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
+        NumberField("Open", nozzle.open, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
+        NumberField("Close", nozzle.close, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
     }
 }
 
@@ -877,12 +946,16 @@ fun NozzleRow(
 fun NumberField(
     label: String,
     value: Double,
+    openValue: Double = 0.0,
     modifier: Modifier = Modifier,
     onValueChange: (Double) -> Unit
 ) {
     var textValue by remember(value) {
         mutableStateOf(if (value == 0.0) "" else if (value % 1.0 == 0.0) value.toLong().toString() else value.toString())
     }
+
+    // MPD Close value cannot be less than Open value
+    val isInvalidClose = label == "Close" && value > 0.0 && value < openValue
 
     OutlinedTextField(
         value = textValue,
@@ -896,11 +969,12 @@ fun NumberField(
         label = { Text(label, fontSize = 8.sp) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         singleLine = true,
+        isError = isInvalidClose,
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = MaterialTheme.colorScheme.onSurface,
             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            focusedBorderColor = if (isInvalidClose) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = if (isInvalidClose) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
         ),
         modifier = modifier
     )
