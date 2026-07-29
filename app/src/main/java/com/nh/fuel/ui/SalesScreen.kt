@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,6 +39,7 @@ fun SalesScreen(
     currentRecord: DailyFuelRecord,
     allRecords: List<DailyFuelRecord> = listOf(currentRecord),
     onRecordChanged: (DailyFuelRecord) -> Unit,
+    onDateSelected: (String) -> Unit = {},
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp
 ) {
@@ -47,14 +49,21 @@ fun SalesScreen(
     val dieselColor = if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
 
     var selectedPeriod by remember { mutableStateOf(PeriodFilter.DAY) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
     var fromDateInput by remember { mutableStateOf(currentRecord.date) }
     var toDateInput by remember { mutableStateOf(currentRecord.date) }
 
-    var petrolPriceText by remember(currentRecord.petrolPrice) { mutableStateOf(currentRecord.petrolPrice.toString()) }
-    var dieselPriceText by remember(currentRecord.dieselPrice) { mutableStateOf(currentRecord.dieselPrice.toString()) }
+    // Fixed cursor jumping: local string state initialized once per record date
+    var petrolPriceText by remember(currentRecord.date) { 
+        mutableStateOf(if (currentRecord.petrolPrice == 0.0) "" else currentRecord.petrolPrice.toString()) 
+    }
+    var dieselPriceText by remember(currentRecord.date) { 
+        mutableStateOf(if (currentRecord.dieselPrice == 0.0) "" else currentRecord.dieselPrice.toString()) 
+    }
 
-    // Filter records according to selected period
-    val filteredRecords = remember(selectedPeriod, fromDateInput, toDateInput, allRecords, currentRecord) {
+    // Filter records based on active period tab
+    val filteredRecords = remember(selectedPeriod, currentRecord, fromDateInput, toDateInput, allRecords) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val records = if (allRecords.none { it.date == currentRecord.date }) {
             allRecords + currentRecord
@@ -115,6 +124,62 @@ fun SalesScreen(
             fontSize = 18.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
+
+        // Date selection header for DAY tab
+        if (selectedPeriod == PeriodFilter.DAY) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Viewing Date: ",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = currentRecord.date,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = { showDatePicker = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Select Date",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
+
+            if (showDatePicker) {
+                var inputDate by remember { mutableStateOf(currentRecord.date) }
+                AlertDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    title = { Text("Select Date (YYYY-MM-DD)", color = MaterialTheme.colorScheme.onSurface) },
+                    text = {
+                        OutlinedTextField(
+                            value = inputDate,
+                            onValueChange = { inputDate = it },
+                            label = { Text("Date") },
+                            singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showDatePicker = false
+                            if (inputDate.isNotBlank()) onDateSelected(inputDate)
+                        }) { Text("Load Date") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                    }
+                )
+            }
+        }
 
         // Fuel Price Input Section
         Card(
@@ -202,7 +267,7 @@ fun SalesScreen(
             }
         }
 
-        // Single Day Shift Breakdown Cards
+        // Shift Breakdown Cards for single Day view
         if (selectedPeriod == PeriodFilter.DAY) {
             Text(
                 text = "Shift Breakdown (${currentRecord.date}):",
@@ -250,7 +315,7 @@ fun SalesScreen(
             }
         }
 
-        // Total Summary Card
+        // Summary Card
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
             modifier = Modifier
@@ -286,7 +351,7 @@ fun SalesScreen(
             }
         }
 
-        // Export to Google / Excel Sheet CSV Button
+        // CSV / Spreadsheet Exporter
         Button(
             onClick = { exportSalesToCSV(context, filteredRecords) },
             modifier = Modifier
