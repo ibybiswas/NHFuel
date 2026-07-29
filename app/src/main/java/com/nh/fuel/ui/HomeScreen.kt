@@ -348,42 +348,33 @@ fun HomeScreenContent(
                 exactStock = record.currentPetrolStorage,
                 lastDipTime = record.lastPetrolDipTime,
                 cumulativeRefill = record.petrolRefill,
-                cumulativeShortage = record.petrolShortage,
+                cumulativeVariation = record.petrolVariation,
                 currentStorage = record.currentPetrolStorage,
                 lastRefill = record.lastPetrolRefill,
-                lastShortageAmount = record.lastPetrolShortageAmount,
-                lastShortageTime = record.lastPetrolShortageTime,
+                lastVariationAmount = record.lastPetrolVariationAmount,
+                lastVariationTime = record.lastPetrolVariationTime,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val isFirstEntry = record.petrolRefill == 0.0 && record.petrolShortage == 0.0 && record.totalPetrolSell == 0.0
+                    val isFirstEntry = record.petrolRefill == 0.0 && record.petrolVariation == 0.0 && record.totalPetrolSell == 0.0
 
                     if (isFirstEntry) {
                         onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
+                    } else if (diff != 0.0) {
+                        // Any gap between the exact dip reading and the expected
+                        // stock is simply logged as a Variation (signed). It is
+                        // no longer auto-treated as a Refill delivery.
+                        onRecordChanged(
+                            record.copy(
+                                petrolTotal = clampedVal,
+                                petrolVariation = record.petrolVariation + diff,
+                                lastPetrolVariationAmount = diff,
+                                lastPetrolVariationTime = nowStr,
+                                lastPetrolDipTime = nowStr
+                            )
+                        )
                     } else {
-                        if (diff > 100.0) {
-                            onRecordChanged(
-                                record.copy(
-                                    petrolTotal = clampedVal,
-                                    petrolRefill = record.petrolRefill + diff,
-                                    lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr),
-                                    lastPetrolDipTime = nowStr
-                                )
-                            )
-                        } else if (diff < 0.0) {
-                            val shortage = -diff
-                            onRecordChanged(
-                                record.copy(
-                                    petrolTotal = clampedVal,
-                                    petrolShortage = record.petrolShortage + shortage,
-                                    lastPetrolShortageAmount = shortage,
-                                    lastPetrolShortageTime = nowStr,
-                                    lastPetrolDipTime = nowStr
-                                )
-                            )
-                        } else {
-                            onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
-                        }
+                        onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
                     }
                 },
                 onAddRefill = { addedLitre ->
@@ -398,16 +389,17 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onAddShortage = { addedShortage ->
+                onAddVariation = { addedLoss ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newShortage = record.petrolShortage + max(0.0, addedShortage)
-                    val newCalculatedStock = max(0.0, record.petrolTotal - addedShortage)
+                    val magnitude = max(0.0, addedLoss)
+                    val newVariation = record.petrolVariation - magnitude
+                    val newCalculatedStock = max(0.0, record.petrolTotal - magnitude)
                     onRecordChanged(
                         record.copy(
                             petrolTotal = newCalculatedStock,
-                            petrolShortage = newShortage,
-                            lastPetrolShortageAmount = max(0.0, addedShortage),
-                            lastPetrolShortageTime = nowStr
+                            petrolVariation = newVariation,
+                            lastPetrolVariationAmount = -magnitude,
+                            lastPetrolVariationTime = nowStr
                         )
                     )
                 },
@@ -425,42 +417,33 @@ fun HomeScreenContent(
                 exactStock = record.currentDieselStorage,
                 lastDipTime = record.lastDieselDipTime,
                 cumulativeRefill = record.dieselRefill,
-                cumulativeShortage = record.dieselShortage,
+                cumulativeVariation = record.dieselVariation,
                 currentStorage = record.currentDieselStorage,
                 lastRefill = record.lastDieselRefill,
-                lastShortageAmount = record.lastDieselShortageAmount,
-                lastShortageTime = record.lastDieselShortageTime,
+                lastVariationAmount = record.lastDieselVariationAmount,
+                lastVariationTime = record.lastDieselVariationTime,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val isFirstEntry = record.dieselRefill == 0.0 && record.dieselShortage == 0.0 && record.totalDieselSell == 0.0
+                    val isFirstEntry = record.dieselRefill == 0.0 && record.dieselVariation == 0.0 && record.totalDieselSell == 0.0
 
                     if (isFirstEntry) {
                         onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
+                    } else if (diff != 0.0) {
+                        // Any gap between the exact dip reading and the expected
+                        // stock is simply logged as a Variation (signed). It is
+                        // no longer auto-treated as a Refill delivery.
+                        onRecordChanged(
+                            record.copy(
+                                dieselTotal = clampedVal,
+                                dieselVariation = record.dieselVariation + diff,
+                                lastDieselVariationAmount = diff,
+                                lastDieselVariationTime = nowStr,
+                                lastDieselDipTime = nowStr
+                            )
+                        )
                     } else {
-                        if (diff > 100.0) {
-                            onRecordChanged(
-                                record.copy(
-                                    dieselTotal = clampedVal,
-                                    dieselRefill = record.dieselRefill + diff,
-                                    lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr),
-                                    lastDieselDipTime = nowStr
-                                )
-                            )
-                        } else if (diff < 0.0) {
-                            val shortage = -diff
-                            onRecordChanged(
-                                record.copy(
-                                    dieselTotal = clampedVal,
-                                    dieselShortage = record.dieselShortage + shortage,
-                                    lastDieselShortageAmount = shortage,
-                                    lastDieselShortageTime = nowStr,
-                                    lastDieselDipTime = nowStr
-                                )
-                            )
-                        } else {
-                            onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
-                        }
+                        onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
                     }
                 },
                 onAddRefill = { addedLitre ->
@@ -475,16 +458,17 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onAddShortage = { addedShortage ->
+                onAddVariation = { addedLoss ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newShortage = record.dieselShortage + max(0.0, addedShortage)
-                    val newCalculatedStock = max(0.0, record.dieselTotal - addedShortage)
+                    val magnitude = max(0.0, addedLoss)
+                    val newVariation = record.dieselVariation - magnitude
+                    val newCalculatedStock = max(0.0, record.dieselTotal - magnitude)
                     onRecordChanged(
                         record.copy(
                             dieselTotal = newCalculatedStock,
-                            dieselShortage = newShortage,
-                            lastDieselShortageAmount = max(0.0, addedShortage),
-                            lastDieselShortageTime = nowStr
+                            dieselVariation = newVariation,
+                            lastDieselVariationAmount = -magnitude,
+                            lastDieselVariationTime = nowStr
                         )
                     )
                 },
@@ -658,14 +642,14 @@ fun FuelTankCard(
     exactStock: Double,
     lastDipTime: String,
     cumulativeRefill: Double,
-    cumulativeShortage: Double,
+    cumulativeVariation: Double,
     currentStorage: Double,
     lastRefill: RefillEvent,
-    lastShortageAmount: Double,
-    lastShortageTime: String,
+    lastVariationAmount: Double,
+    lastVariationTime: String,
     onConfirmExactStock: (Double, Double) -> Unit,
     onAddRefill: (Double) -> Unit,
-    onAddShortage: (Double) -> Unit,
+    onAddVariation: (Double) -> Unit,
     onUpdateLastRefill: (RefillEvent) -> Unit
 ) {
     var isEditingExactStock by remember { mutableStateOf(false) }
@@ -674,7 +658,7 @@ fun FuelTankCard(
     }
 
     var newRefillInput by remember { mutableStateOf("") }
-    var newShortageInput by remember { mutableStateOf("") }
+    var newVariationInput by remember { mutableStateOf("") }
 
     var showConfirmationDialog by remember { mutableStateOf(false) }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
@@ -814,34 +798,38 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Shortage Section
+            // Variation Section (manual loss entry; recorded as a negative variation)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
-                    value = newShortageInput,
-                    onValueChange = { newShortageInput = it },
-                    label = { Text("Add Shortage (-)", fontSize = 8.sp) },
+                    value = newVariationInput,
+                    onValueChange = { newVariationInput = it },
+                    label = { Text("Record Variation (-)", fontSize = 8.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
                 Button(
                     onClick = {
-                        val added = newShortageInput.toDoubleOrNull() ?: 0.0
+                        val added = newVariationInput.toDoubleOrNull() ?: 0.0
                         if (added > 0.0) {
-                            onAddShortage(added)
-                            newShortageInput = ""
+                            onAddVariation(added)
+                            newVariationInput = ""
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) { Text("-", fontSize = 12.sp) }
             }
-            Text("Total Shortage: $cumulativeShortage L", fontSize = 10.sp, color = Color(0xFFFF5252))
+            Text(
+                text = "Total Variation: ${if (cumulativeVariation > 0.0) "+" else ""}$cumulativeVariation L",
+                fontSize = 10.sp,
+                color = if (cumulativeVariation < 0.0) Color(0xFFFF5252) else stockColor
+            )
 
             Column {
-                Text("Last Shortage:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("Last Variation:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    text = if (lastShortageTime.isNotBlank()) "$lastShortageAmount L @ $lastShortageTime" else "None",
+                    text = if (lastVariationTime.isNotBlank()) "${if (lastVariationAmount > 0.0) "+" else ""}$lastVariationAmount L @ $lastVariationTime" else "None",
                     fontSize = 8.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -876,16 +864,16 @@ fun FuelTankCard(
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    if (diff > 100.0) {
+                    if (diff > 0.0) {
                         Text(
-                            text = "Detected Refill Delivery: +${diff} Litres",
+                            text = "Variation Detected: +$diff Litres (surplus)",
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF2E7D32),
                             fontSize = 12.sp
                         )
                     } else if (diff < 0.0) {
                         Text(
-                            text = "Detected Shortage / Dip Loss: -${-diff} Litres",
+                            text = "Variation Detected: ${diff} Litres (shortage)",
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFC62828),
                             fontSize = 12.sp
@@ -896,6 +884,12 @@ fun FuelTankCard(
                             fontSize = 12.sp
                         )
                     }
+
+                    Text(
+                        text = "This is recorded as a Variation only — it is not treated as a Refill.",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     Text(
                         text = "Current & Exact Stock will be synced to $targetVal Litres.",
