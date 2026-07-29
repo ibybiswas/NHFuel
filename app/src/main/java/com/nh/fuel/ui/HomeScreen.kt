@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.fuel.data.*
@@ -62,20 +63,23 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HEADER_CONTENT_HEIGHT,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                        NAV_BAR_HEIGHT + NAV_BAR_VERTICAL_MARGIN * 2
-                )
-        ) {
+        // Passed down as spacer padding inside each tab's own scrollable
+        // content, instead of an outer Box padding here — that way content
+        // actually scrolls underneath the glass header/nav (revealing it
+        // blended through them) rather than stopping short and leaving the
+        // bars floating over plain empty background.
+        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HEADER_CONTENT_HEIGHT
+        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+            NAV_BAR_HEIGHT + NAV_BAR_VERTICAL_MARGIN * 2
+
+        Box(modifier = Modifier.fillMaxSize()) {
             when (selectedMainTab) {
                 0 -> HomeScreenContent(
                     record = record,
                     onRecordChanged = onRecordChanged,
-                    onDateSelected = onDateSelected
+                    onDateSelected = onDateSelected,
+                    topInset = topInset,
+                    bottomInset = bottomInset
                 )
                 1 -> PlaceholderTab("Sales Dashboard")
                 2 -> PlaceholderTab("Reports & Analytics")
@@ -84,7 +88,9 @@ fun MainContainerScreen(
                     currentOpacity = navBarOpacity,
                     currentThemeMode = themeMode,
                     onOpacityChanged = onOpacityChanged,
-                    onThemeModeChanged = onThemeModeChanged
+                    onThemeModeChanged = onThemeModeChanged,
+                    topInset = topInset,
+                    bottomInset = bottomInset
                 )
             }
         }
@@ -349,7 +355,9 @@ internal fun Modifier.cleanGlassBackground(tint: Color, opacity: Float): Modifie
 fun HomeScreenContent(
     record: DailyFuelRecord,
     onRecordChanged: (DailyFuelRecord) -> Unit,
-    onDateSelected: (String) -> Unit
+    onDateSelected: (String) -> Unit,
+    topInset: Dp = 0.dp,
+    bottomInset: Dp = 0.dp
 ) {
     var selectedShiftTab by remember { mutableStateOf(1) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -362,10 +370,17 @@ fun HomeScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Rather than padding the whole screen away from the header/nav
+        // (which left them sitting over plain empty background), these
+        // spacers just set the initial resting position — as the list
+        // scrolls, cards pass underneath the glass bars instead of stopping
+        // short of them, which is what makes the glass tint actually show
+        // blended content instead of looking like a solid opaque strip.
+        Spacer(Modifier.height(topInset + 4.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -693,6 +708,8 @@ fun HomeScreenContent(
                 Text("• Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 13.sp)
             }
         }
+
+        Spacer(Modifier.height(bottomInset + 4.dp))
     }
 }
 
