@@ -50,6 +50,7 @@ data class DailyFuelRecord(
     val lastPetrolRefill: RefillEvent = RefillEvent(),
     val lastPetrolVariationAmount: Double = 0.0,
     val lastPetrolVariationTime: String = "",
+    val lastPetrolDipAmount: Double = 0.0,
     val lastPetrolDipTime: String = "",
 
     val dieselTotal: Double = 0.0,
@@ -58,6 +59,7 @@ data class DailyFuelRecord(
     val lastDieselRefill: RefillEvent = RefillEvent(),
     val lastDieselVariationAmount: Double = 0.0,
     val lastDieselVariationTime: String = "",
+    val lastDieselDipAmount: Double = 0.0,
     val lastDieselDipTime: String = "",
 
     val shift1: DayShift = DayShift(1),
@@ -67,13 +69,8 @@ data class DailyFuelRecord(
     val totalPetrolSell: Double get() = shift1.petrolSale + shift2.petrolSale + shift3.petrolSale
     val totalDieselSell: Double get() = shift1.dieselSale + shift2.dieselSale + shift3.dieselSale
 
-    // Variation is signed: positive = surplus found during a dip reading,
-    // negative = shortage/loss found during a dip reading. It is no longer
-    // auto-classified as a "Refill" — refills only come from the explicit
-    // "Add Refill" action.
     val currentPetrolStorage: Double 
         get() = max(0.0, (petrolTotal + petrolRefill) + petrolVariation - totalPetrolSell)
-
     val currentDieselStorage: Double 
         get() = max(0.0, (dieselTotal + dieselRefill) + dieselVariation - totalDieselSell)
 }
