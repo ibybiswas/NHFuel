@@ -347,7 +347,7 @@ fun HomeScreenContent(
     bottomInset: Dp = 0.dp
 ) {
     var selectedShiftTab by remember { mutableStateOf(1) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDatePickerModal by remember { mutableStateOf(false) }
     var showSaveFullDayDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(record.date) {
@@ -387,7 +387,7 @@ fun HomeScreenContent(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            IconButton(onClick = { showDatePicker = true }) {
+            IconButton(onClick = { showDatePickerModal = true }) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Edit Date",
@@ -396,33 +396,28 @@ fun HomeScreenContent(
             }
         }
 
-        if (showDatePicker) {
-            var inputDate by remember { mutableStateOf(record.date) }
-            AlertDialog(
-                onDismissRequest = { showDatePicker = false },
-                title = { Text("Select Date (YYYY-MM-DD)", color = MaterialTheme.colorScheme.onSurface) },
-                text = {
-                    OutlinedTextField(
-                        value = inputDate,
-                        onValueChange = { inputDate = it },
-                        label = { Text("Date") },
-                        singleLine = true
-                    )
-                },
+        if (showDatePickerModal) {
+            val datePickerState = rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { showDatePickerModal = false },
                 confirmButton = {
                     TextButton(onClick = {
-                        showDatePicker = false
-                        if (inputDate.isNotBlank()) onDateSelected(inputDate)
-                    }) { Text("Load Date") }
+                        showDatePickerModal = false
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            onDateSelected(sdf.format(Date(millis)))
+                        }
+                    }) { Text("Select Date", fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                    TextButton(onClick = { showDatePickerModal = false }) { Text("Cancel") }
                 }
-            )
+            ) {
+                DatePicker(state = datePickerState)
+            }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Petrol Tank Card
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Petrol Tank Storage",
@@ -507,7 +502,6 @@ fun HomeScreenContent(
                 }
             )
 
-            // Diesel Tank Card
             FuelTankCard(
                 modifier = Modifier.weight(1f),
                 title = "Diesel Tank Storage",
@@ -731,7 +725,6 @@ fun HomeScreenContent(
             }
         }
 
-        // Save & Finalize Full Day Button
         if (record.shift3.isComplete) {
             Button(
                 onClick = { showSaveFullDayDialog = true },
@@ -886,7 +879,6 @@ fun FuelTankCard(
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
-            // Exact Stock Section
             Column {
                 Text("Exact Stock:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
                 if (!isEditingExactStock) {
@@ -984,7 +976,6 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Refill Section
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
                     value = newRefillInput,
@@ -1037,7 +1028,6 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Variation
             Text(
                 text = "Total Variation: ${if (cumulativeVariation > 0.0) "+" else ""}$cumulativeVariation L",
                 fontSize = 10.sp,
@@ -1054,7 +1044,6 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Current Stock Section
             Column {
                 Text("Current Stock:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
