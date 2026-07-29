@@ -367,4 +367,3 @@ private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>) {
         e.printStackTrace()
     }
 }
-```[cite: 1]
