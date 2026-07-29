@@ -391,12 +391,9 @@ fun HomeScreenContent(
                 },
                 onAddVariation = { signedAmount ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newVariation = record.petrolVariation + signedAmount
-                    val newCalculatedStock = max(0.0, record.petrolTotal + signedAmount)
                     onRecordChanged(
                         record.copy(
-                            petrolTotal = newCalculatedStock,
-                            petrolVariation = newVariation,
+                            petrolVariation = record.petrolVariation + signedAmount,
                             lastPetrolVariationAmount = signedAmount,
                             lastPetrolVariationTime = nowStr
                         )
@@ -459,12 +456,9 @@ fun HomeScreenContent(
                 },
                 onAddVariation = { signedAmount ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newVariation = record.dieselVariation + signedAmount
-                    val newCalculatedStock = max(0.0, record.dieselTotal + signedAmount)
                     onRecordChanged(
                         record.copy(
-                            dieselTotal = newCalculatedStock,
-                            dieselVariation = newVariation,
+                            dieselVariation = record.dieselVariation + signedAmount,
                             lastDieselVariationAmount = signedAmount,
                             lastDieselVariationTime = nowStr
                         )
@@ -807,28 +801,32 @@ fun FuelTankCard(
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
-                Button(
-                    onClick = {
-                        val added = newVariationInput.toDoubleOrNull() ?: 0.0
-                        if (added > 0.0) {
-                            onAddVariation(added)
-                            newVariationInput = ""
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                ) { Text("+", fontSize = 12.sp) }
-                Button(
-                    onClick = {
-                        val added = newVariationInput.toDoubleOrNull() ?: 0.0
-                        if (added > 0.0) {
-                            onAddVariation(-added)
-                            newVariationInput = ""
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                ) { Text("-", fontSize = 12.sp) }
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Button(
+                        onClick = {
+                            val added = newVariationInput.toDoubleOrNull() ?: 0.0
+                            if (added > 0.0) {
+                                onAddVariation(added)
+                                newVariationInput = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.height(24.dp)
+                    ) { Text("+", fontSize = 11.sp) }
+                    Button(
+                        onClick = {
+                            val added = newVariationInput.toDoubleOrNull() ?: 0.0
+                            if (added > 0.0) {
+                                onAddVariation(-added)
+                                newVariationInput = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.height(24.dp)
+                    ) { Text("-", fontSize = 11.sp) }
+                }
             }
             Text(
                 text = "Total Variation: ${if (cumulativeVariation > 0.0) "+" else ""}$cumulativeVariation L",
