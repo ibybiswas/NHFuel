@@ -389,16 +389,15 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onAddVariation = { addedLoss ->
+                onAddVariation = { signedAmount ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val magnitude = max(0.0, addedLoss)
-                    val newVariation = record.petrolVariation - magnitude
-                    val newCalculatedStock = max(0.0, record.petrolTotal - magnitude)
+                    val newVariation = record.petrolVariation + signedAmount
+                    val newCalculatedStock = max(0.0, record.petrolTotal + signedAmount)
                     onRecordChanged(
                         record.copy(
                             petrolTotal = newCalculatedStock,
                             petrolVariation = newVariation,
-                            lastPetrolVariationAmount = -magnitude,
+                            lastPetrolVariationAmount = signedAmount,
                             lastPetrolVariationTime = nowStr
                         )
                     )
@@ -458,16 +457,15 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onAddVariation = { addedLoss ->
+                onAddVariation = { signedAmount ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val magnitude = max(0.0, addedLoss)
-                    val newVariation = record.dieselVariation - magnitude
-                    val newCalculatedStock = max(0.0, record.dieselTotal - magnitude)
+                    val newVariation = record.dieselVariation + signedAmount
+                    val newCalculatedStock = max(0.0, record.dieselTotal + signedAmount)
                     onRecordChanged(
                         record.copy(
                             dieselTotal = newCalculatedStock,
                             dieselVariation = newVariation,
-                            lastDieselVariationAmount = -magnitude,
+                            lastDieselVariationAmount = signedAmount,
                             lastDieselVariationTime = nowStr
                         )
                     )
@@ -798,12 +796,13 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Variation Section (manual loss entry; recorded as a negative variation)
+            // Variation Section: enter a magnitude, then tap + (surplus) or − (shortage).
+            // Either button records a signed Variation and updates Current/Exact stock.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
                     value = newVariationInput,
                     onValueChange = { newVariationInput = it },
-                    label = { Text("Record Variation (-)", fontSize = 8.sp) },
+                    label = { Text("Record Variation", fontSize = 8.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -813,6 +812,17 @@ fun FuelTankCard(
                         val added = newVariationInput.toDoubleOrNull() ?: 0.0
                         if (added > 0.0) {
                             onAddVariation(added)
+                            newVariationInput = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) { Text("+", fontSize = 12.sp) }
+                Button(
+                    onClick = {
+                        val added = newVariationInput.toDoubleOrNull() ?: 0.0
+                        if (added > 0.0) {
+                            onAddVariation(-added)
                             newVariationInput = ""
                         }
                     },
