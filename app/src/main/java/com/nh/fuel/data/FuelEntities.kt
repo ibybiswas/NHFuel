@@ -9,11 +9,6 @@ data class RefillEvent(
     val timestamp: String = ""
 )
 
-data class ShortageEvent(
-    val amount: Double = 0.0,
-    val timestamp: String = ""
-)
-
 data class NozzleShift(
     val open: Double = 0.0,
     val close: Double = 0.0
@@ -53,14 +48,16 @@ data class DailyFuelRecord(
     val petrolRefill: Double = 0.0,
     val petrolShortage: Double = 0.0,
     val lastPetrolRefill: RefillEvent = RefillEvent(),
-    val lastPetrolShortage: ShortageEvent = ShortageEvent(),
+    val lastPetrolShortageAmount: Double = 0.0,
+    val lastPetrolShortageTime: String = "",
     val lastPetrolDipTime: String = "",
 
     val dieselTotal: Double = 0.0,
     val dieselRefill: Double = 0.0,
     val dieselShortage: Double = 0.0,
     val lastDieselRefill: RefillEvent = RefillEvent(),
-    val lastDieselShortage: ShortageEvent = ShortageEvent(),
+    val lastDieselShortageAmount: Double = 0.0,
+    val lastDieselShortageTime: String = "",
     val lastDieselDipTime: String = "",
 
     val shift1: DayShift = DayShift(1),
