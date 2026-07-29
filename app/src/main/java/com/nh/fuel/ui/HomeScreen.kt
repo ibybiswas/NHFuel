@@ -467,13 +467,12 @@ fun HomeScreenContent(
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newRefill = record.petrolRefill + max(0.0, addedLitre)
-                    val newCalculatedStock = max(0.0, record.petrolTotal + addedLitre)
+                    val validAdded = max(0.0, addedLitre)
+                    val newRefill = record.petrolRefill + validAdded
                     onRecordChanged(
                         record.copy(
-                            petrolTotal = newCalculatedStock,
                             petrolRefill = newRefill,
-                            lastPetrolRefill = RefillEvent(amount = max(0.0, addedLitre), timestamp = nowStr)
+                            lastPetrolRefill = RefillEvent(amount = validAdded, timestamp = nowStr)
                         )
                     )
                 },
@@ -481,7 +480,6 @@ fun HomeScreenContent(
                     val lastAmount = record.lastPetrolRefill.amount
                     onRecordChanged(
                         record.copy(
-                            petrolTotal = max(0.0, record.petrolTotal - lastAmount),
                             petrolRefill = max(0.0, record.petrolRefill - lastAmount),
                             lastPetrolRefill = RefillEvent()
                         )
@@ -554,13 +552,12 @@ fun HomeScreenContent(
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val newRefill = record.dieselRefill + max(0.0, addedLitre)
-                    val newCalculatedStock = max(0.0, record.dieselTotal + addedLitre)
+                    val validAdded = max(0.0, addedLitre)
+                    val newRefill = record.dieselRefill + validAdded
                     onRecordChanged(
                         record.copy(
-                            dieselTotal = newCalculatedStock,
                             dieselRefill = newRefill,
-                            lastDieselRefill = RefillEvent(amount = max(0.0, addedLitre), timestamp = nowStr)
+                            lastDieselRefill = RefillEvent(amount = validAdded, timestamp = nowStr)
                         )
                     )
                 },
@@ -568,7 +565,6 @@ fun HomeScreenContent(
                     val lastAmount = record.lastDieselRefill.amount
                     onRecordChanged(
                         record.copy(
-                            dieselTotal = max(0.0, record.dieselTotal - lastAmount),
                             dieselRefill = max(0.0, record.dieselRefill - lastAmount),
                             lastDieselRefill = RefillEvent()
                         )
@@ -715,7 +711,7 @@ fun HomeScreenContent(
             }
         }
 
-        // Save & Finalize Full Day Button (appears after Shift 3 is complete)
+        // Save & Finalize Full Day Button
         if (record.shift3.isComplete) {
             Button(
                 onClick = { showSaveFullDayDialog = true },
@@ -742,7 +738,6 @@ fun HomeScreenContent(
         Spacer(Modifier.height(bottomInset + 4.dp))
     }
 
-    // Confirmation Popup for Saving Full Day Cycle
     if (showSaveFullDayDialog) {
         AlertDialog(
             onDismissRequest = { showSaveFullDayDialog = false },
@@ -772,8 +767,7 @@ fun HomeScreenContent(
                     onClick = {
                         showSaveFullDayDialog = false
                         
-                        // Parse current date & compute next day string
-                        val sdf = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault())
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         val parsedDate = try { sdf.parse(record.date) } catch (e: Exception) { Date() }
                         val cal = Calendar.getInstance().apply {
                             time = parsedDate ?: Date()
@@ -781,7 +775,6 @@ fun HomeScreenContent(
                         }
                         val nextDateStr = sdf.format(cal.time)
 
-                        // Closing values of Shift 3 carry forward as Shift 1 Open values for next day
                         val s3Mpd1 = record.shift3.mpd1
                         val s3Mpd2 = record.shift3.mpd2
 
@@ -808,7 +801,6 @@ fun HomeScreenContent(
                             shift1 = nextDayShift1
                         )
 
-                        // Persist saved record & navigate to next date
                         onRecordChanged(record)
                         onRecordChanged(newNextDayRecord)
                         onDateSelected(nextDateStr)
@@ -1181,13 +1173,11 @@ fun ShiftInputBlock(
     var showSkipWarningDialog by remember { mutableStateOf(false) }
     var countdown by remember { mutableStateOf(5) }
 
-    // Check if close readings have been entered anywhere in this shift
     val hasCloseValueEntered = shift.mpd1.petrolN2.close > 0.0 || shift.mpd1.petrolN3.close > 0.0 ||
         shift.mpd1.dieselN1.close > 0.0 || shift.mpd1.dieselN4.close > 0.0 ||
         shift.mpd2.petrolN2.close > 0.0 || shift.mpd2.petrolN3.close > 0.0 ||
         shift.mpd2.dieselN1.close > 0.0 || shift.mpd2.dieselN4.close > 0.0
 
-    // Countdown Timer Effect when Skip dialog is active
     LaunchedEffect(showSkipWarningDialog) {
         if (showSkipWarningDialog) {
             countdown = 5
@@ -1211,7 +1201,6 @@ fun ShiftInputBlock(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            // Skip button: Only visible if no close meter value has been entered
             if (!hasCloseValueEntered && !shift.isComplete) {
                 OutlinedButton(
                     onClick = { showSkipWarningDialog = true },
@@ -1243,7 +1232,6 @@ fun ShiftInputBlock(
         }
     }
 
-    // Skip Shift Warning Dialog with 5-Second Countdown
     if (showSkipWarningDialog) {
         AlertDialog(
             onDismissRequest = { showSkipWarningDialog = false },
@@ -1274,7 +1262,6 @@ fun ShiftInputBlock(
                     onClick = {
                         showSkipWarningDialog = false
 
-                        // Automatically populate close = open for all nozzles
                         val skippedMpd1 = shift.mpd1.copy(
                             petrolN2 = shift.mpd1.petrolN2.copy(close = shift.mpd1.petrolN2.open),
                             petrolN3 = shift.mpd1.petrolN3.copy(close = shift.mpd1.petrolN3.open),
