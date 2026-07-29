@@ -334,6 +334,11 @@ fun HomeScreenContent(
     var showDatePicker by remember { mutableStateOf(false) }
     var showSaveFullDayDialog by remember { mutableStateOf(false) }
 
+    // Reset selected shift tab back to Shift 1 whenever a new record or date is loaded
+    LaunchedEffect(record.date) {
+        selectedShiftTab = 1
+    }
+
     val isDark = isSystemInDarkTheme()
     val petrolColor = if (isDark) Color(0xFFFF8A80) else Color(0xFFC62828)
     val dieselColor = if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
