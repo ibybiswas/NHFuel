@@ -116,7 +116,6 @@ fun SalesScreen(
     val totalCollected = filteredRecords.sumOf { it.dailyTotalCollected }
     val totalMismatch = filteredRecords.sumOf { it.dailyMismatch }
 
-    // Navigation function to offset date by -1 or +1 days
     fun navigateDate(daysOffset: Int) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val parsedDate = try { sdf.parse(currentRecord.date) ?: Date() } catch (e: Exception) { Date() }
@@ -143,7 +142,6 @@ fun SalesScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        // Previous Day / Next Day navigation header for DAY tab
         if (selectedPeriod == PeriodFilter.DAY) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -215,7 +213,6 @@ fun SalesScreen(
             }
         }
 
-        // Fuel Price Input Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -264,7 +261,6 @@ fun SalesScreen(
             }
         }
 
-        // Period Filter Tabs
         ScrollableTabRow(
             selectedTabIndex = selectedPeriod.ordinal,
             edgePadding = 0.dp
@@ -278,7 +274,6 @@ fun SalesScreen(
             }
         }
 
-        // Custom Date Range Inputs
         if (selectedPeriod == PeriodFilter.CUSTOM) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -301,7 +296,6 @@ fun SalesScreen(
             }
         }
 
-        // Shift Breakdown Cards for single Day view with MPD 1 & MPD 2 Collection Inputs
         if (selectedPeriod == PeriodFilter.DAY) {
             Text(
                 text = "Shift Breakdown & Payment Collections (${currentRecord.date}):",
@@ -347,7 +341,6 @@ fun SalesScreen(
             )
         }
 
-        // Summary Card with Collection & Mismatch Metrics
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
             modifier = Modifier
@@ -413,7 +406,6 @@ fun SalesScreen(
             }
         }
 
-        // CSV / Spreadsheet Exporter
         Button(
             onClick = { exportSalesToCSV(context, filteredRecords) },
             modifier = Modifier
@@ -465,7 +457,6 @@ private fun ShiftDetailedSalesBlock(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // MPD 1 Column
                 MpdSalesColumn(
                     mpdTitle = "MPD 1",
                     dispenser = shift.mpd1,
@@ -479,7 +470,6 @@ private fun ShiftDetailedSalesBlock(
                     }
                 )
 
-                // MPD 2 Column
                 MpdSalesColumn(
                     mpdTitle = "MPD 2",
                     dispenser = shift.mpd2,
@@ -560,7 +550,6 @@ private fun MpdSalesColumn(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 1.dp))
 
-            // Cash and Digital editable payment boxes
             OutlinedTextField(
                 value = cashText,
                 onValueChange = { input ->
@@ -622,21 +611,23 @@ private fun formatSignedCurrency(amount: Double): String {
     return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
 }
 
-/** Aggregated daily CSV export with Revenue, Cash, Digital, Total Collected, and Net Mismatch */
+/** Fixed CSV Export: Prepends UTF-8 BOM (\uFEFF) and outputs raw decimal values for mismatch */
 private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>) {
+    val utf8Bom = "\uFEFF"
     val csvHeader = "Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n"
     val csvBody = StringBuilder()
 
     records.forEach { record ->
+        val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
         csvBody.append(
-            "${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},${formatSignedCurrency(record.dailyMismatch)}\n"
+            "${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},${rawMismatch}\n"
         )
     }
 
     try {
         val fileName = "NHFuel_Sales_Report_${System.currentTimeMillis()}.csv"
         val file = File(context.cacheDir, fileName)
-        file.writeText(csvHeader + csvBody.toString())
+        file.writeText(utf8Bom + csvHeader + csvBody.toString(), Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
