@@ -80,6 +80,7 @@ fun MainContainerScreen(
                 1 -> SalesScreen(
                     currentRecord = record,
                     onRecordChanged = onRecordChanged,
+                    onDateSelected = onDateSelected,
                     topInset = topInset,
                     bottomInset = bottomInset
                 )
