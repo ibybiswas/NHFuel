@@ -41,12 +41,15 @@ import kotlin.math.max
 @Composable
 fun MainContainerScreen(
     record: DailyFuelRecord,
+    allExpenses: List<ExpenseItem> = emptyList(),
     navBarOpacity: Float,
     themeMode: ThemeMode,
     onRecordChanged: (DailyFuelRecord) -> Unit,
     onDateSelected: (String) -> Unit,
     onOpacityChanged: (Float) -> Unit,
-    onThemeModeChanged: (ThemeMode) -> Unit
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    onAddOrUpdateExpense: (ExpenseItem) -> Unit = {},
+    onDeleteExpense: (ExpenseItem) -> Unit = {}
 ) {
     var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
@@ -85,7 +88,14 @@ fun MainContainerScreen(
                     bottomInset = bottomInset
                 )
                 2 -> PlaceholderTab("Reports & Analytics")
-                3 -> PlaceholderTab("Expenditure Tracker")
+                3 -> ExpendScreen(
+                    currentRecordDate = record.date,
+                    allExpenses = allExpenses,
+                    onAddOrUpdateExpense = onAddOrUpdateExpense,
+                    onDeleteExpense = onDeleteExpense,
+                    topInset = topInset,
+                    bottomInset = bottomInset
+                )
                 4 -> SettingsScreen(
                     currentOpacity = navBarOpacity,
                     currentThemeMode = themeMode,
