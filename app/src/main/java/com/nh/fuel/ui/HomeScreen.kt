@@ -63,11 +63,6 @@ fun MainContainerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Passed down as spacer padding inside each tab's own scrollable
-        // content, instead of an outer Box padding here — that way content
-        // actually scrolls underneath the glass header/nav (revealing it
-        // blended through them) rather than stopping short and leaving the
-        // bars floating over plain empty background.
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HEADER_CONTENT_HEIGHT
         val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
             NAV_BAR_HEIGHT + NAV_BAR_VERTICAL_MARGIN * 2
@@ -95,9 +90,6 @@ fun MainContainerScreen(
             }
         }
 
-        // Flush liquid-glass header: a full-width translucent bar sitting
-        // right up against the (transparent) status bar — no side margins,
-        // no separate opaque strip above it — matching ScanApp's header.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -161,7 +153,6 @@ fun MainContainerScreen(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-
                         DropdownMenuItem(
                             text = { Text("Light", fontSize = 13.sp) },
                             leadingIcon = { Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -173,7 +164,6 @@ fun MainContainerScreen(
                                 showThemeMenu = false
                             }
                         )
-
                         DropdownMenuItem(
                             text = { Text("Dark", fontSize = 13.sp) },
                             leadingIcon = { Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -185,7 +175,6 @@ fun MainContainerScreen(
                                 showThemeMenu = false
                             }
                         )
-
                         DropdownMenuItem(
                             text = { Text("Auto (system default)", fontSize = 13.sp) },
                             leadingIcon = { Icon(Icons.Default.BrightnessAuto, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -202,11 +191,6 @@ fun MainContainerScreen(
             }
         }
 
-        // Floating liquid-glass bottom nav — a tight rounded bar (not a
-        // full CircleShape pill, which was stretching the ends out and
-        // padding the items far apart) with hand-built centered icon+label
-        // items instead of NavigationBarItem's larger fixed touch targets,
-        // so there's no extra dead space around it or inside it.
         NHFuelBottomNav(
             selectedIndex = selectedMainTab,
             glassOpacity = navBarOpacity,
@@ -216,19 +200,11 @@ fun MainContainerScreen(
     }
 }
 
-/** Fixed opacity of the header's glass background — only the bottom nav's opacity is user-tunable. */
 private const val HEADER_GLASS_OPACITY = 0.6f
-
 private val HEADER_CONTENT_HEIGHT = 52.dp
 private val NAV_BAR_HEIGHT = 64.dp
 private val NAV_BAR_VERTICAL_MARGIN = 8.dp
 
-/**
- * Floating liquid-glass bottom navigation bar: a flat translucent tint at a
- * user-controlled [glassOpacity] (persisted via [AppPreferences]), a thin
- * hairline border, and a springy sliding indicator behind the selected tab
- * — styled after ScanApp's ScanAppBottomNav.
- */
 @Composable
 private fun NHFuelBottomNav(
     selectedIndex: Int,
@@ -272,6 +248,7 @@ private fun NHFuelBottomNav(
                 ),
                 label = "navIndicatorOffset"
             )
+
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
@@ -298,7 +275,6 @@ private fun NHFuelBottomNav(
     }
 }
 
-/** One tab: icon above label, both centered in the slot it's given. */
 @Composable
 private fun NHFuelBottomNavItem(
     icon: ImageVector,
@@ -339,12 +315,6 @@ private fun NHFuelBottomNavItem(
     }
 }
 
-/**
- * Flat translucent tint used for every "liquid glass" surface in the app
- * (the header, the bottom nav): just the theme's container color at a
- * caller-chosen alpha, clamped to [AppPreferences]'s allowed range so
- * callers can pass a raw slider value straight through.
- */
 internal fun Modifier.cleanGlassBackground(tint: Color, opacity: Float): Modifier {
     val clamped = opacity.coerceIn(AppPreferences.MIN_GLASS_OPACITY, AppPreferences.MAX_GLASS_OPACITY)
     return this.background(tint.copy(alpha = clamped))
@@ -374,13 +344,8 @@ fun HomeScreenContent(
             .padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Rather than padding the whole screen away from the header/nav
-        // (which left them sitting over plain empty background), these
-        // spacers just set the initial resting position — as the list
-        // scrolls, cards pass underneath the glass bars instead of stopping
-        // short of them, which is what makes the glass tint actually show
-        // blended content instead of looking like a solid opaque strip.
         Spacer(Modifier.height(topInset + 4.dp))
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -457,20 +422,20 @@ fun HomeScreenContent(
                     if (isFirstEntry) {
                         onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
                     } else if (diff != 0.0) {
-                        // Any gap between the exact dip reading and the expected
-                        // stock is simply logged as a Variation (signed). It is
-                        // no longer auto-treated as a Refill delivery.
+                        val newVariation = record.petrolVariation + diff
+                        val requiredTotal = clampedVal + record.totalPetrolSell - record.petrolRefill - newVariation
                         onRecordChanged(
                             record.copy(
-                                petrolTotal = clampedVal,
-                                petrolVariation = record.petrolVariation + diff,
+                                petrolTotal = max(0.0, requiredTotal),
+                                petrolVariation = newVariation,
                                 lastPetrolVariationAmount = diff,
                                 lastPetrolVariationTime = nowStr,
                                 lastPetrolDipTime = nowStr
                             )
                         )
                     } else {
-                        onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
+                        val requiredTotal = clampedVal + record.totalPetrolSell - record.petrolRefill - record.petrolVariation
+                        onRecordChanged(record.copy(petrolTotal = max(0.0, requiredTotal), lastPetrolDipTime = nowStr))
                     }
                 },
                 onAddRefill = { addedLitre ->
@@ -512,20 +477,20 @@ fun HomeScreenContent(
                     if (isFirstEntry) {
                         onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
                     } else if (diff != 0.0) {
-                        // Any gap between the exact dip reading and the expected
-                        // stock is simply logged as a Variation (signed). It is
-                        // no longer auto-treated as a Refill delivery.
+                        val newVariation = record.dieselVariation + diff
+                        val requiredTotal = clampedVal + record.totalDieselSell - record.dieselRefill - newVariation
                         onRecordChanged(
                             record.copy(
-                                dieselTotal = clampedVal,
-                                dieselVariation = record.dieselVariation + diff,
+                                dieselTotal = max(0.0, requiredTotal),
+                                dieselVariation = newVariation,
                                 lastDieselVariationAmount = diff,
                                 lastDieselVariationTime = nowStr,
                                 lastDieselDipTime = nowStr
                             )
                         )
                     } else {
-                        onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
+                        val requiredTotal = clampedVal + record.totalDieselSell - record.dieselRefill - record.dieselVariation
+                        onRecordChanged(record.copy(dieselTotal = max(0.0, requiredTotal), lastDieselDipTime = nowStr))
                     }
                 },
                 onAddRefill = { addedLitre ->
@@ -556,13 +521,13 @@ fun HomeScreenContent(
                 selected = selectedShiftTab == 2,
                 enabled = record.shift1.isComplete,
                 onClick = { if (record.shift1.isComplete) selectedShiftTab = 2 },
-                text = { Text(if (record.shift1.isComplete) "Shift 2" else "Shift 2 🔒") }
+                text = { Text(if (record.shift1.isComplete) "Shift 2" else "Shift 2  ") }
             )
             Tab(
                 selected = selectedShiftTab == 3,
                 enabled = record.shift2.isComplete,
                 onClick = { if (record.shift2.isComplete) selectedShiftTab = 3 },
-                text = { Text(if (record.shift2.isComplete) "Shift 3" else "Shift 3 🔒") }
+                text = { Text(if (record.shift2.isComplete) "Shift 3" else "Shift 3  ") }
             )
         }
 
@@ -635,7 +600,6 @@ fun HomeScreenContent(
                     }
                     else -> record.copy(shift3 = updatedShift)
                 }
-
                 onRecordChanged(newRecord)
             }
         )
@@ -653,39 +617,34 @@ fun HomeScreenContent(
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Shift 1", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
-                        Text("• Petrol: ${record.shift1.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
-                        Text("• Diesel: ${record.shift1.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
+                        Text("  Petrol: ${record.shift1.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                        Text("  Diesel: ${record.shift1.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                     }
-
                     if (record.shift1.isComplete || record.shift2.petrolSale > 0.0 || record.shift2.dieselSale > 0.0) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Shift 2", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
-                            Text("• Petrol: ${record.shift2.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
-                            Text("• Diesel: ${record.shift2.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
+                            Text("  Petrol: ${record.shift2.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                            Text("  Diesel: ${record.shift2.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                         }
                     }
-
                     if (record.shift2.isComplete || record.shift3.petrolSale > 0.0 || record.shift3.dieselSale > 0.0) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Shift 3", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
-                            Text("• Petrol: ${record.shift3.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
-                            Text("• Diesel: ${record.shift3.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
+                            Text("  Petrol: ${record.shift3.petrolSale} L", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 10.sp)
+                            Text("  Diesel: ${record.shift3.dieselSale} L", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 10.sp)
                         }
                     }
                 }
-
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
                 Text("Total 24H Full Day Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("• Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 13.sp)
-                Text("• Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 13.sp)
+                Text("  Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 13.sp)
+                Text("  Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 13.sp)
             }
         }
 
@@ -725,9 +684,7 @@ fun FuelTankCard(
     var pendingInput by remember(exactStock) {
         mutableStateOf(if (exactStock == 0.0) "" else if (exactStock % 1.0 == 0.0) exactStock.toLong().toString() else exactStock.toString())
     }
-
     var newRefillInput by remember { mutableStateOf("") }
-
     var showConfirmationDialog by remember { mutableStateOf(false) }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
 
@@ -741,7 +698,6 @@ fun FuelTankCard(
             // Exact Stock Section
             Column {
                 Text("Exact Stock:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
-
                 if (!isEditingExactStock) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -754,7 +710,6 @@ fun FuelTankCard(
                             color = stockColor,
                             fontSize = 18.sp
                         )
-
                         IconButton(
                             onClick = { isEditingExactStock = true },
                             modifier = Modifier.size(28.dp)
@@ -789,7 +744,6 @@ fun FuelTankCard(
                             ),
                             modifier = Modifier.weight(1f)
                         )
-
                         IconButton(
                             onClick = {
                                 val parsed = max(0.0, pendingInput.toDoubleOrNull() ?: 0.0)
@@ -808,7 +762,6 @@ fun FuelTankCard(
                         }
                     }
                 }
-
                 Text(
                     text = if (lastDipTime.isNotBlank()) "Last Reading: $lastDipTime" else "Last Reading: None",
                     fontSize = 8.sp,
@@ -866,15 +819,12 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Variation is derived automatically from Exact Stock − Current
-            // Stock whenever a dip reading is confirmed (see
-            // onConfirmExactStock above) — there's no manual entry for it.
+            // Variation
             Text(
                 text = "Total Variation: ${if (cumulativeVariation > 0.0) "+" else ""}$cumulativeVariation L",
                 fontSize = 10.sp,
                 color = if (cumulativeVariation < 0.0) Color(0xFFFF5252) else stockColor
             )
-
             Column {
                 Text("Last Variation:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
@@ -910,7 +860,6 @@ fun FuelTankCard(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Entered Dip Reading: $targetVal Litres", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text("Expected Current Stock: $currentStorage Litres", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     if (diff > 0.0) {
@@ -939,7 +888,6 @@ fun FuelTankCard(
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         text = "Current & Exact Stock will be synced to $targetVal Litres.",
                         fontSize = 11.sp,
@@ -1004,11 +952,9 @@ fun ShiftInputBlock(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(shiftTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
-
         DispenserShiftCard("MPD 1", shift.mpd1, petrolColor, dieselColor) { updatedMpd1 ->
             onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
         }
-
         DispenserShiftCard("MPD 2", shift.mpd2, petrolColor, dieselColor) { updatedMpd2 ->
             onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
         }
@@ -1037,7 +983,6 @@ fun DispenserShiftCard(
                     NozzleRow("N2", dispenser.petrolN2) { updated -> onUpdate(dispenser.copy(petrolN2 = updated)) }
                     NozzleRow("N3", dispenser.petrolN3) { updated -> onUpdate(dispenser.copy(petrolN3 = updated)) }
                 }
-
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Diesel (N1, N4)", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 11.sp)
                     NozzleRow("N1", dispenser.dieselN1) { updated -> onUpdate(dispenser.copy(dieselN1 = updated)) }
@@ -1076,7 +1021,6 @@ fun NumberField(
     var textValue by remember(value) {
         mutableStateOf(if (value == 0.0) "" else if (value % 1.0 == 0.0) value.toLong().toString() else value.toString())
     }
-
     val isInvalidClose = label == "Close" && value > 0.0 && value < openValue
 
     OutlinedTextField(
