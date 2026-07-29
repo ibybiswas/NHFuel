@@ -485,16 +485,6 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onAddVariation = { signedAmount ->
-                    val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    onRecordChanged(
-                        record.copy(
-                            petrolVariation = record.petrolVariation + signedAmount,
-                            lastPetrolVariationAmount = signedAmount,
-                            lastPetrolVariationTime = nowStr
-                        )
-                    )
-                },
                 onUpdateLastRefill = { updatedRefill ->
                     onRecordChanged(record.copy(lastPetrolRefill = updatedRefill))
                 }
@@ -547,16 +537,6 @@ fun HomeScreenContent(
                             dieselTotal = newCalculatedStock,
                             dieselRefill = newRefill,
                             lastDieselRefill = RefillEvent(amount = max(0.0, addedLitre), timestamp = nowStr)
-                        )
-                    )
-                },
-                onAddVariation = { signedAmount ->
-                    val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    onRecordChanged(
-                        record.copy(
-                            dieselVariation = record.dieselVariation + signedAmount,
-                            lastDieselVariationAmount = signedAmount,
-                            lastDieselVariationTime = nowStr
                         )
                     )
                 },
@@ -739,7 +719,6 @@ fun FuelTankCard(
     lastVariationTime: String,
     onConfirmExactStock: (Double, Double) -> Unit,
     onAddRefill: (Double) -> Unit,
-    onAddVariation: (Double) -> Unit,
     onUpdateLastRefill: (RefillEvent) -> Unit
 ) {
     var isEditingExactStock by remember { mutableStateOf(false) }
@@ -748,7 +727,6 @@ fun FuelTankCard(
     }
 
     var newRefillInput by remember { mutableStateOf("") }
-    var newVariationInput by remember { mutableStateOf("") }
 
     var showConfirmationDialog by remember { mutableStateOf(false) }
     var showEditLastRefillDialog by remember { mutableStateOf(false) }
@@ -888,44 +866,9 @@ fun FuelTankCard(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Variation Section: enter a magnitude, then tap + (surplus) or − (shortage).
-            // Either button records a signed Variation and updates Current/Exact stock.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedTextField(
-                    value = newVariationInput,
-                    onValueChange = { newVariationInput = it },
-                    label = { Text("Record Variation", fontSize = 8.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Button(
-                        onClick = {
-                            val added = newVariationInput.toDoubleOrNull() ?: 0.0
-                            if (added > 0.0) {
-                                onAddVariation(added)
-                                newVariationInput = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.height(24.dp)
-                    ) { Text("+", fontSize = 11.sp) }
-                    Button(
-                        onClick = {
-                            val added = newVariationInput.toDoubleOrNull() ?: 0.0
-                            if (added > 0.0) {
-                                onAddVariation(-added)
-                                newVariationInput = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.height(24.dp)
-                    ) { Text("-", fontSize = 11.sp) }
-                }
-            }
+            // Variation is derived automatically from Exact Stock − Current
+            // Stock whenever a dip reading is confirmed (see
+            // onConfirmExactStock above) — there's no manual entry for it.
             Text(
                 text = "Total Variation: ${if (cumulativeVariation > 0.0) "+" else ""}$cumulativeVariation L",
                 fontSize = 10.sp,
