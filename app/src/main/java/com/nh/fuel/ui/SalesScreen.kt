@@ -53,7 +53,7 @@ fun SalesScreen(
     val dieselColor = if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
 
     var selectedPeriod by remember { mutableStateOf(PeriodFilter.DAY) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDatePickerModal by remember { mutableStateOf(false) }
 
     var fromDateInput by remember { mutableStateOf(currentRecord.date) }
     var toDateInput by remember { mutableStateOf(currentRecord.date) }
@@ -165,7 +165,7 @@ fun SalesScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
                     IconButton(
-                        onClick = { showDatePicker = true },
+                        onClick = { showDatePickerModal = true },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
@@ -185,31 +185,6 @@ fun SalesScreen(
                     Text("Next Day", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Icon(Icons.Default.ChevronRight, contentDescription = "Next Day", modifier = Modifier.size(16.dp))
                 }
-            }
-
-            if (showDatePicker) {
-                var inputDate by remember { mutableStateOf(currentRecord.date) }
-                AlertDialog(
-                    onDismissRequest = { showDatePicker = false },
-                    title = { Text("Select Date (YYYY-MM-DD)", color = MaterialTheme.colorScheme.onSurface) },
-                    text = {
-                        OutlinedTextField(
-                            value = inputDate,
-                            onValueChange = { inputDate = it },
-                            label = { Text("Date") },
-                            singleLine = true
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showDatePicker = false
-                            if (inputDate.isNotBlank()) onDateSelected(inputDate)
-                        }) { Text("Load Date") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-                    }
-                )
             }
         }
 
@@ -407,7 +382,16 @@ fun SalesScreen(
         }
 
         Button(
-            onClick = { exportSalesToCSV(context, filteredRecords) },
+            onClick = {
+                val periodDesc = when (selectedPeriod) {
+                    PeriodFilter.DAY -> "Day: ${currentRecord.date}"
+                    PeriodFilter.WEEK -> "Week Ending: ${currentRecord.date}"
+                    PeriodFilter.MONTH -> "Month: ${currentRecord.date.take(7)}"
+                    PeriodFilter.YEAR -> "Year: ${currentRecord.date.take(4)}"
+                    PeriodFilter.CUSTOM -> "Custom Period: $fromDateInput to $toDateInput"
+                }
+                exportSalesToCSV(context, filteredRecords, periodDesc)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(46.dp),
@@ -419,6 +403,28 @@ fun SalesScreen(
         }
 
         Spacer(Modifier.height(bottomInset + 4.dp))
+    }
+
+    // Material 3 Date Picker Dialog
+    if (showDatePickerModal) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePickerModal = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePickerModal = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        onDateSelected(sdf.format(Date(millis)))
+                    }
+                }) { Text("Select Date", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePickerModal = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 
@@ -611,9 +617,10 @@ private fun formatSignedCurrency(amount: Double): String {
     return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
 }
 
-/** Fixed CSV Export: Prepends UTF-8 BOM (\uFEFF) and outputs raw decimal values for mismatch */
-private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>) {
+private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>, periodDescription: String) {
     val utf8Bom = "\uFEFF"
+    val reportHeader = "NH Fuel Station Sales Report\n" +
+            "Report Period: $periodDescription\n\n"
     val csvHeader = "Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n"
     val csvBody = StringBuilder()
 
@@ -627,7 +634,7 @@ private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>) {
     try {
         val fileName = "NHFuel_Sales_Report_${System.currentTimeMillis()}.csv"
         val file = File(context.cacheDir, fileName)
-        file.writeText(utf8Bom + csvHeader + csvBody.toString(), Charsets.UTF_8)
+        file.writeText(utf8Bom + reportHeader + csvHeader + csvBody.toString(), Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
