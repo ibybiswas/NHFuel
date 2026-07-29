@@ -2,6 +2,7 @@ package com.nh.fuel.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlin.math.max
 
 data class RefillEvent(
     val amount: Double = 0.0,
@@ -12,6 +13,8 @@ data class NozzleShift(
     val open: Double = 0.0,
     val close: Double = 0.0
 ) {
+    // Closing value must be greater than or equal to opening value
+    val isValid: Boolean get() = close >= open || close == 0.0
     val sale: Double get() = if (close >= open && close > 0.0) close - open else 0.0
     val isClosed: Boolean get() = close > 0.0 && close >= open
 }
@@ -59,6 +62,10 @@ data class DailyFuelRecord(
     val totalPetrolSell: Double get() = shift1.petrolSale + shift2.petrolSale + shift3.petrolSale
     val totalDieselSell: Double get() = shift1.dieselSale + shift2.dieselSale + shift3.dieselSale
 
-    val currentPetrolStorage: Double get() = (petrolTotal + petrolRefill) - petrolShortage - totalPetrolSell
-    val currentDieselStorage: Double get() = (dieselTotal + dieselRefill) - dieselShortage - totalDieselSell
+    // Stocks clamped to minimum 0.0 (Never negative)
+    val currentPetrolStorage: Double 
+        get() = max(0.0, (petrolTotal + petrolRefill) - petrolShortage - totalPetrolSell)
+
+    val currentDieselStorage: Double 
+        get() = max(0.0, (dieselTotal + dieselRefill) - dieselShortage - totalDieselSell)
 }
