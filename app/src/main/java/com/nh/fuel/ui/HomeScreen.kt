@@ -351,7 +351,8 @@ fun HomeScreenContent(
                 cumulativeShortage = record.petrolShortage,
                 currentStorage = record.currentPetrolStorage,
                 lastRefill = record.lastPetrolRefill,
-                lastShortage = record.lastPetrolShortage,
+                lastShortageAmount = record.lastPetrolShortageAmount,
+                lastShortageTime = record.lastPetrolShortageTime,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
@@ -375,7 +376,8 @@ fun HomeScreenContent(
                                 record.copy(
                                     petrolTotal = clampedVal,
                                     petrolShortage = record.petrolShortage + shortage,
-                                    lastPetrolShortage = ShortageEvent(amount = shortage, timestamp = nowStr),
+                                    lastPetrolShortageAmount = shortage,
+                                    lastPetrolShortageTime = nowStr,
                                     lastPetrolDipTime = nowStr
                                 )
                             )
@@ -404,7 +406,8 @@ fun HomeScreenContent(
                         record.copy(
                             petrolTotal = newCalculatedStock,
                             petrolShortage = newShortage,
-                            lastPetrolShortage = ShortageEvent(amount = max(0.0, addedShortage), timestamp = nowStr)
+                            lastPetrolShortageAmount = max(0.0, addedShortage),
+                            lastPetrolShortageTime = nowStr
                         )
                     )
                 },
@@ -425,7 +428,8 @@ fun HomeScreenContent(
                 cumulativeShortage = record.dieselShortage,
                 currentStorage = record.currentDieselStorage,
                 lastRefill = record.lastDieselRefill,
-                lastShortage = record.lastDieselShortage,
+                lastShortageAmount = record.lastDieselShortageAmount,
+                lastShortageTime = record.lastDieselShortageTime,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
@@ -449,7 +453,8 @@ fun HomeScreenContent(
                                 record.copy(
                                     dieselTotal = clampedVal,
                                     dieselShortage = record.dieselShortage + shortage,
-                                    lastDieselShortage = ShortageEvent(amount = shortage, timestamp = nowStr),
+                                    lastDieselShortageAmount = shortage,
+                                    lastDieselShortageTime = nowStr,
                                     lastDieselDipTime = nowStr
                                 )
                             )
@@ -478,7 +483,8 @@ fun HomeScreenContent(
                         record.copy(
                             dieselTotal = newCalculatedStock,
                             dieselShortage = newShortage,
-                            lastDieselShortage = ShortageEvent(amount = max(0.0, addedShortage), timestamp = nowStr)
+                            lastDieselShortageAmount = max(0.0, addedShortage),
+                            lastDieselShortageTime = nowStr
                         )
                     )
                 },
@@ -655,7 +661,8 @@ fun FuelTankCard(
     cumulativeShortage: Double,
     currentStorage: Double,
     lastRefill: RefillEvent,
-    lastShortage: ShortageEvent,
+    lastShortageAmount: Double,
+    lastShortageTime: String,
     onConfirmExactStock: (Double, Double) -> Unit,
     onAddRefill: (Double) -> Unit,
     onAddShortage: (Double) -> Unit,
@@ -834,7 +841,7 @@ fun FuelTankCard(
             Column {
                 Text("Last Shortage:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    text = if (lastShortage.timestamp.isNotBlank()) "${lastShortage.amount} L @ ${lastShortage.timestamp}" else "None",
+                    text = if (lastShortageTime.isNotBlank()) "$lastShortageAmount L @ $lastShortageTime" else "None",
                     fontSize = 8.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
