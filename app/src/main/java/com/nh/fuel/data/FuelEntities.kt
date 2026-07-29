@@ -62,6 +62,10 @@ data class DailyFuelRecord(
     val lastDieselDipAmount: Double = 0.0,
     val lastDieselDipTime: String = "",
 
+    // Added fuel price tracking per day (in Rupees / Litre)
+    val petrolPrice: Double = 100.0,
+    val dieselPrice: Double = 90.0,
+
     val shift1: DayShift = DayShift(1),
     val shift2: DayShift = DayShift(2),
     val shift3: DayShift = DayShift(3)
@@ -73,4 +77,24 @@ data class DailyFuelRecord(
         get() = max(0.0, (petrolTotal + petrolRefill) + petrolVariation - totalPetrolSell)
     val currentDieselStorage: Double 
         get() = max(0.0, (dieselTotal + dieselRefill) + dieselVariation - totalDieselSell)
+
+    // Financial Calculation Helpers (in Rupees ₹)
+    fun getPetrolAmount(litres: Double): Double = litres * petrolPrice
+    fun getDieselAmount(litres: Double): Double = litres * dieselPrice
+
+    val shift1PetrolRevenue: Double get() = getPetrolAmount(shift1.petrolSale)
+    val shift1DieselRevenue: Double get() = getDieselAmount(shift1.dieselSale)
+    val shift1TotalRevenue: Double get() = shift1PetrolRevenue + shift1DieselRevenue
+
+    val shift2PetrolRevenue: Double get() = getPetrolAmount(shift2.petrolSale)
+    val shift2DieselRevenue: Double get() = getDieselAmount(shift2.dieselSale)
+    val shift2TotalRevenue: Double get() = shift2PetrolRevenue + shift2DieselRevenue
+
+    val shift3PetrolRevenue: Double get() = getPetrolAmount(shift3.petrolSale)
+    val shift3DieselRevenue: Double get() = getDieselAmount(shift3.dieselSale)
+    val shift3TotalRevenue: Double get() = shift3PetrolRevenue + shift3DieselRevenue
+
+    val totalPetrolRevenue: Double get() = getPetrolAmount(totalPetrolSell)
+    val totalDieselRevenue: Double get() = getDieselAmount(totalDieselSell)
+    val grandTotalRevenue: Double get() = totalPetrolRevenue + totalDieselRevenue
 }
