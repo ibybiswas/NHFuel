@@ -22,12 +22,26 @@ data class DispenserShift(
     val petrolN2: NozzleShift = NozzleShift(),
     val petrolN3: NozzleShift = NozzleShift(),
     val dieselN1: NozzleShift = NozzleShift(),
-    val dieselN4: NozzleShift = NozzleShift()
+    val dieselN4: NozzleShift = NozzleShift(),
+
+    // Payment collection tracking per MPD dispenser
+    val cashCollected: Double = 0.0,
+    val digitalCollected: Double = 0.0
 ) {
     val petrolSale: Double get() = petrolN2.sale + petrolN3.sale
     val dieselSale: Double get() = dieselN1.sale + dieselN4.sale
     val isShiftComplete: Boolean
         get() = petrolN2.isClosed && petrolN3.isClosed && dieselN1.isClosed && dieselN4.isClosed
+
+    val totalCollected: Double get() = cashCollected + digitalCollected
+
+    fun getRevenue(petrolPrice: Double, dieselPrice: Double): Double {
+        return (petrolSale * petrolPrice) + (dieselSale * dieselPrice)
+    }
+
+    fun getMismatch(petrolPrice: Double, dieselPrice: Double): Double {
+        return totalCollected - getRevenue(petrolPrice, dieselPrice)
+    }
 }
 
 data class DayShift(
@@ -38,6 +52,18 @@ data class DayShift(
     val petrolSale: Double get() = mpd1.petrolSale + mpd2.petrolSale
     val dieselSale: Double get() = mpd1.dieselSale + mpd2.dieselSale
     val isComplete: Boolean get() = mpd1.isShiftComplete && mpd2.isShiftComplete
+
+    val totalCashCollected: Double get() = mpd1.cashCollected + mpd2.cashCollected
+    val totalDigitalCollected: Double get() = mpd1.digitalCollected + mpd2.digitalCollected
+    val totalCollected: Double get() = totalCashCollected + totalDigitalCollected
+
+    fun getRevenue(petrolPrice: Double, dieselPrice: Double): Double {
+        return mpd1.getRevenue(petrolPrice, dieselPrice) + mpd2.getRevenue(petrolPrice, dieselPrice)
+    }
+
+    fun getMismatch(petrolPrice: Double, dieselPrice: Double): Double {
+        return totalCollected - getRevenue(petrolPrice, dieselPrice)
+    }
 }
 
 @Entity(tableName = "daily_fuel_records")
@@ -62,7 +88,6 @@ data class DailyFuelRecord(
     val lastDieselDipAmount: Double = 0.0,
     val lastDieselDipTime: String = "",
 
-    // Added fuel price tracking per day (in Rupees / Litre)
     val petrolPrice: Double = 100.0,
     val dieselPrice: Double = 90.0,
 
@@ -78,23 +103,16 @@ data class DailyFuelRecord(
     val currentDieselStorage: Double 
         get() = max(0.0, (dieselTotal + dieselRefill) + dieselVariation - totalDieselSell)
 
-    // Financial Calculation Helpers (in Rupees ₹)
     fun getPetrolAmount(litres: Double): Double = litres * petrolPrice
     fun getDieselAmount(litres: Double): Double = litres * dieselPrice
-
-    val shift1PetrolRevenue: Double get() = getPetrolAmount(shift1.petrolSale)
-    val shift1DieselRevenue: Double get() = getDieselAmount(shift1.dieselSale)
-    val shift1TotalRevenue: Double get() = shift1PetrolRevenue + shift1DieselRevenue
-
-    val shift2PetrolRevenue: Double get() = getPetrolAmount(shift2.petrolSale)
-    val shift2DieselRevenue: Double get() = getDieselAmount(shift2.dieselSale)
-    val shift2TotalRevenue: Double get() = shift2PetrolRevenue + shift2DieselRevenue
-
-    val shift3PetrolRevenue: Double get() = getPetrolAmount(shift3.petrolSale)
-    val shift3DieselRevenue: Double get() = getDieselAmount(shift3.dieselSale)
-    val shift3TotalRevenue: Double get() = shift3PetrolRevenue + shift3DieselRevenue
 
     val totalPetrolRevenue: Double get() = getPetrolAmount(totalPetrolSell)
     val totalDieselRevenue: Double get() = getDieselAmount(totalDieselSell)
     val grandTotalRevenue: Double get() = totalPetrolRevenue + totalDieselRevenue
+
+    // Aggregated Daily Collections & Mismatch
+    val dailyCashCollected: Double get() = shift1.totalCashCollected + shift2.totalCashCollected + shift3.totalCashCollected
+    val dailyDigitalCollected: Double get() = shift1.totalDigitalCollected + shift2.totalDigitalCollected + shift3.totalDigitalCollected
+    val dailyTotalCollected: Double get() = dailyCashCollected + dailyDigitalCollected
+    val dailyMismatch: Double get() = dailyTotalCollected - grandTotalRevenue
 }
