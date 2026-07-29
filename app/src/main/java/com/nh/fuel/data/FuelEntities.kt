@@ -9,11 +9,15 @@ data class RefillEvent(
     val timestamp: String = ""
 )
 
+data class ShortageEvent(
+    val amount: Double = 0.0,
+    val timestamp: String = ""
+)
+
 data class NozzleShift(
     val open: Double = 0.0,
     val close: Double = 0.0
 ) {
-    // Closing value must be greater than or equal to opening value
     val isValid: Boolean get() = close >= open || close == 0.0
     val sale: Double get() = if (close >= open && close > 0.0) close - open else 0.0
     val isClosed: Boolean get() = close > 0.0 && close >= open
@@ -49,11 +53,15 @@ data class DailyFuelRecord(
     val petrolRefill: Double = 0.0,
     val petrolShortage: Double = 0.0,
     val lastPetrolRefill: RefillEvent = RefillEvent(),
+    val lastPetrolShortage: ShortageEvent = ShortageEvent(),
+    val lastPetrolDipTime: String = "",
 
     val dieselTotal: Double = 0.0,
     val dieselRefill: Double = 0.0,
     val dieselShortage: Double = 0.0,
     val lastDieselRefill: RefillEvent = RefillEvent(),
+    val lastDieselShortage: ShortageEvent = ShortageEvent(),
+    val lastDieselDipTime: String = "",
 
     val shift1: DayShift = DayShift(1),
     val shift2: DayShift = DayShift(2),
@@ -62,7 +70,6 @@ data class DailyFuelRecord(
     val totalPetrolSell: Double get() = shift1.petrolSale + shift2.petrolSale + shift3.petrolSale
     val totalDieselSell: Double get() = shift1.dieselSale + shift2.dieselSale + shift3.dieselSale
 
-    // Stocks clamped to minimum 0.0 (Never negative)
     val currentPetrolStorage: Double 
         get() = max(0.0, (petrolTotal + petrolRefill) - petrolShortage - totalPetrolSell)
 
