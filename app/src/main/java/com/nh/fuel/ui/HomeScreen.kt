@@ -1,11 +1,16 @@
 package com.nh.fuel.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -16,8 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -61,8 +66,9 @@ fun MainContainerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 54.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 68.dp
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HEADER_CONTENT_HEIGHT,
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                        NAV_BAR_HEIGHT + NAV_BAR_VERTICAL_MARGIN * 2
                 )
         ) {
             when (selectedMainTab) {
@@ -83,184 +89,259 @@ fun MainContainerScreen(
             }
         }
 
-        // Header Overlay
+        // Flush liquid-glass header: a full-width translucent bar sitting
+        // right up against the (transparent) status bar — no side margins,
+        // no separate opaque strip above it — matching ScanApp's header.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 4.dp)
                 .align(Alignment.TopCenter)
+                .cleanGlassBackground(
+                    tint = MaterialTheme.colorScheme.surfaceContainer,
+                    opacity = HEADER_GLASS_OPACITY
+                )
         ) {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .statusBarsPadding()
+                    .height(HEADER_CONTENT_HEIGHT)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "NH FUEL STATION",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 16.sp,
-                            letterSpacing = 1.1.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = currentTimeString,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column {
+                    Text(
+                        text = "NH FUEL STATION",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 16.sp,
+                        letterSpacing = 1.1.sp,
+                        fontFamily = FontFamily.SansSerif,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = currentTimeString,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { showThemeMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = when (themeMode) {
+                                ThemeMode.LIGHT -> Icons.Default.LightMode
+                                ThemeMode.DARK -> Icons.Default.DarkMode
+                                ThemeMode.AUTO -> Icons.Default.BrightnessAuto
+                            },
+                            contentDescription = "Theme Switcher",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    Box {
-                        IconButton(
-                            onClick = { showThemeMenu = true },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = when (themeMode) {
-                                    ThemeMode.LIGHT -> Icons.Default.LightMode
-                                    ThemeMode.DARK -> Icons.Default.DarkMode
-                                    ThemeMode.AUTO -> Icons.Default.BrightnessAuto
-                                },
-                                contentDescription = "Theme Switcher",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    DropdownMenu(
+                        expanded = showThemeMenu,
+                        onDismissRequest = { showThemeMenu = false }
+                    ) {
+                        Text(
+                            text = "Appearance",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                        DropdownMenu(
-                            expanded = showThemeMenu,
-                            onDismissRequest = { showThemeMenu = false }
-                        ) {
-                            Text(
-                                text = "Appearance",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        DropdownMenuItem(
+                            text = { Text("Light", fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            trailingIcon = if (themeMode == ThemeMode.LIGHT) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            onClick = {
+                                onThemeModeChanged(ThemeMode.LIGHT)
+                                showThemeMenu = false
+                            }
+                        )
 
-                            DropdownMenuItem(
-                                text = { Text("Light", fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                trailingIcon = if (themeMode == ThemeMode.LIGHT) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                } else null,
-                                onClick = {
-                                    onThemeModeChanged(ThemeMode.LIGHT)
-                                    showThemeMenu = false
-                                }
-                            )
+                        DropdownMenuItem(
+                            text = { Text("Dark", fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            trailingIcon = if (themeMode == ThemeMode.DARK) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            onClick = {
+                                onThemeModeChanged(ThemeMode.DARK)
+                                showThemeMenu = false
+                            }
+                        )
 
-                            DropdownMenuItem(
-                                text = { Text("Dark", fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                trailingIcon = if (themeMode == ThemeMode.DARK) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                } else null,
-                                onClick = {
-                                    onThemeModeChanged(ThemeMode.DARK)
-                                    showThemeMenu = false
-                                }
-                            )
-
-                            DropdownMenuItem(
-                                text = { Text("Auto (system default)", fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.BrightnessAuto, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                                trailingIcon = if (themeMode == ThemeMode.AUTO) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                } else null,
-                                onClick = {
-                                    onThemeModeChanged(ThemeMode.AUTO)
-                                    showThemeMenu = false
-                                }
-                            )
-                        }
+                        DropdownMenuItem(
+                            text = { Text("Auto (system default)", fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.BrightnessAuto, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            trailingIcon = if (themeMode == ThemeMode.AUTO) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            onClick = {
+                                onThemeModeChanged(ThemeMode.AUTO)
+                                showThemeMenu = false
+                            }
+                        )
                     }
                 }
             }
         }
 
-        // Floating Bottom Navigation Pill
-        Box(
+        // Floating liquid-glass bottom nav — a tight rounded bar (not a
+        // full CircleShape pill, which was stretching the ends out and
+        // padding the items far apart) with hand-built centered icon+label
+        // items instead of NavigationBarItem's larger fixed touch targets,
+        // so there's no extra dead space around it or inside it.
+        NHFuelBottomNav(
+            selectedIndex = selectedMainTab,
+            glassOpacity = navBarOpacity,
+            onTabSelected = { selectedMainTab = it },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+/** Fixed opacity of the header's glass background — only the bottom nav's opacity is user-tunable. */
+private const val HEADER_GLASS_OPACITY = 0.6f
+
+private val HEADER_CONTENT_HEIGHT = 52.dp
+private val NAV_BAR_HEIGHT = 64.dp
+private val NAV_BAR_VERTICAL_MARGIN = 8.dp
+
+/**
+ * Floating liquid-glass bottom navigation bar: a flat translucent tint at a
+ * user-controlled [glassOpacity] (persisted via [AppPreferences]), a thin
+ * hairline border, and a springy sliding indicator behind the selected tab
+ * — styled after ScanApp's ScanAppBottomNav.
+ */
+@Composable
+private fun NHFuelBottomNav(
+    selectedIndex: Int,
+    glassOpacity: Float,
+    onTabSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val items = listOf(
+        Triple("Home", Icons.Default.Home, 0),
+        Triple("Sales", Icons.Default.Payments, 1),
+        Triple("Report", Icons.Default.Assessment, 2),
+        Triple("Expend", Icons.Default.AccountBalanceWallet, 3),
+        Triple("Setting", Icons.Default.Settings, 4)
+    )
+    val shape = RoundedCornerShape(28.dp)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = NAV_BAR_VERTICAL_MARGIN)
+            .height(NAV_BAR_HEIGHT)
+            .clip(shape)
+            .cleanGlassBackground(
+                tint = MaterialTheme.colorScheme.surfaceContainer,
+                opacity = glassOpacity
+            )
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), shape)
+    ) {
+        BoxWithConstraints(
             modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 6.dp, start = 12.dp, end = 12.dp)
-                .align(Alignment.BottomCenter)
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 8.dp)
         ) {
+            val slotWidth = maxWidth / items.size
+            val indicatorOffset by animateDpAsState(
+                targetValue = slotWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "navIndicatorOffset"
+            )
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .shadow(elevation = 8.dp, shape = CircleShape)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = navBarOpacity))
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), CircleShape)
-            ) {
-                NavigationBar(
-                    containerColor = Color.Transparent,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier.fillMaxSize(),
-                    windowInsets = WindowInsets(0, 0, 0, 0)
-                ) {
-                    val itemColors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        indicatorColor = Color.Transparent
-                    )
+                    .offset(x = indicatorOffset)
+                    .width(slotWidth)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
+            )
+        }
 
-                    NavigationBarItem(
-                        selected = selectedMainTab == 0,
-                        onClick = { selectedMainTab = 0 },
-                        label = { Text("Home", fontSize = 10.sp, fontWeight = if (selectedMainTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Home", modifier = Modifier.size(20.dp)) },
-                        colors = itemColors
-                    )
-                    NavigationBarItem(
-                        selected = selectedMainTab == 1,
-                        onClick = { selectedMainTab = 1 },
-                        label = { Text("Sales", fontSize = 10.sp, fontWeight = if (selectedMainTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.Payments, contentDescription = "Sales", modifier = Modifier.size(20.dp)) },
-                        colors = itemColors
-                    )
-                    NavigationBarItem(
-                        selected = selectedMainTab == 2,
-                        onClick = { selectedMainTab = 2 },
-                        label = { Text("Report", fontSize = 10.sp, fontWeight = if (selectedMainTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.Assessment, contentDescription = "Report", modifier = Modifier.size(20.dp)) },
-                        colors = itemColors
-                    )
-                    NavigationBarItem(
-                        selected = selectedMainTab == 3,
-                        onClick = { selectedMainTab = 3 },
-                        label = { Text("Expend", fontSize = 10.sp, fontWeight = if (selectedMainTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Expend", modifier = Modifier.size(20.dp)) },
-                        colors = itemColors
-                    )
-                    NavigationBarItem(
-                        selected = selectedMainTab == 4,
-                        onClick = { selectedMainTab = 4 },
-                        label = { Text("Setting", fontSize = 10.sp, fontWeight = if (selectedMainTab == 4) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Setting", modifier = Modifier.size(20.dp)) },
-                        colors = itemColors
-                    )
-                }
+        Row(modifier = Modifier.fillMaxSize()) {
+            items.forEach { (label, icon, index) ->
+                NHFuelBottomNavItem(
+                    icon = icon,
+                    label = label,
+                    selected = selectedIndex == index,
+                    onClick = { onTabSelected(index) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
             }
         }
     }
+}
+
+/** One tab: icon above label, both centered in the slot it's given. */
+@Composable
+private fun NHFuelBottomNavItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        label = "navItemColor"
+    )
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = label, tint = contentColor, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            color = contentColor,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
+
+/**
+ * Flat translucent tint used for every "liquid glass" surface in the app
+ * (the header, the bottom nav): just the theme's container color at a
+ * caller-chosen alpha, clamped to [AppPreferences]'s allowed range so
+ * callers can pass a raw slider value straight through.
+ */
+internal fun Modifier.cleanGlassBackground(tint: Color, opacity: Float): Modifier {
+    val clamped = opacity.coerceIn(AppPreferences.MIN_GLASS_OPACITY, AppPreferences.MAX_GLASS_OPACITY)
+    return this.background(tint.copy(alpha = clamped))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

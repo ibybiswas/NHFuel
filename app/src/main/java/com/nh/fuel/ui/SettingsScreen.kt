@@ -57,8 +57,7 @@ fun SettingsScreen(
                 Slider(
                     value = currentOpacity,
                     onValueChange = { onOpacityChanged(it) },
-                    valueRange = 0.2f..1.0f,
-                    steps = 16
+                    valueRange = AppPreferences.MIN_GLASS_OPACITY..AppPreferences.MAX_GLASS_OPACITY
                 )
             }
         }
