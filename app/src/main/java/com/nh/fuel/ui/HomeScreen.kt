@@ -71,7 +71,7 @@ fun MainContainerScreen(
                     onRecordChanged = onRecordChanged,
                     onDateSelected = onDateSelected
                 )
-                1 -> PlaceholderTab("Sell Dashboard")
+                1 -> PlaceholderTab("Sales Dashboard")
                 2 -> PlaceholderTab("Reports & Analytics")
                 3 -> PlaceholderTab("Expenditure Tracker")
                 4 -> SettingsScreen(
@@ -83,7 +83,7 @@ fun MainContainerScreen(
             }
         }
 
-        // Header
+        // Header Overlay
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -232,8 +232,8 @@ fun MainContainerScreen(
                     NavigationBarItem(
                         selected = selectedMainTab == 1,
                         onClick = { selectedMainTab = 1 },
-                        label = { Text("Sell", fontSize = 10.sp, fontWeight = if (selectedMainTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Sell", modifier = Modifier.size(20.dp)) },
+                        label = { Text("Sales", fontSize = 10.sp, fontWeight = if (selectedMainTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(Icons.Default.Payments, contentDescription = "Sales", modifier = Modifier.size(20.dp)) },
                         colors = itemColors
                     )
                     NavigationBarItem(
@@ -345,25 +345,28 @@ fun HomeScreenContent(
                 title = "Petrol Tank Storage",
                 color = petrolColor,
                 stockColor = stockColor,
-                exactStock = record.petrolTotal,
+                exactStock = record.currentPetrolStorage,
+                lastDipTime = record.lastPetrolDipTime,
                 cumulativeRefill = record.petrolRefill,
                 cumulativeShortage = record.petrolShortage,
                 currentStorage = record.currentPetrolStorage,
                 lastRefill = record.lastPetrolRefill,
+                lastShortage = record.lastPetrolShortage,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val isFirstEntry = record.petrolRefill == 0.0 && record.petrolShortage == 0.0 && record.totalPetrolSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(petrolTotal = clampedVal))
+                        onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
                     } else {
                         if (diff > 100.0) {
                             onRecordChanged(
                                 record.copy(
                                     petrolTotal = clampedVal,
                                     petrolRefill = record.petrolRefill + diff,
-                                    lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr)
+                                    lastPetrolRefill = RefillEvent(amount = diff, timestamp = nowStr),
+                                    lastPetrolDipTime = nowStr
                                 )
                             )
                         } else if (diff < 0.0) {
@@ -371,11 +374,13 @@ fun HomeScreenContent(
                             onRecordChanged(
                                 record.copy(
                                     petrolTotal = clampedVal,
-                                    petrolShortage = record.petrolShortage + shortage
+                                    petrolShortage = record.petrolShortage + shortage,
+                                    lastPetrolShortage = ShortageEvent(amount = shortage, timestamp = nowStr),
+                                    lastPetrolDipTime = nowStr
                                 )
                             )
                         } else {
-                            onRecordChanged(record.copy(petrolTotal = clampedVal))
+                            onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
                         }
                     }
                 },
@@ -392,12 +397,14 @@ fun HomeScreenContent(
                     )
                 },
                 onAddShortage = { addedShortage ->
+                    val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val newShortage = record.petrolShortage + max(0.0, addedShortage)
                     val newCalculatedStock = max(0.0, record.petrolTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
                             petrolTotal = newCalculatedStock,
-                            petrolShortage = newShortage
+                            petrolShortage = newShortage,
+                            lastPetrolShortage = ShortageEvent(amount = max(0.0, addedShortage), timestamp = nowStr)
                         )
                     )
                 },
@@ -412,25 +419,28 @@ fun HomeScreenContent(
                 title = "Diesel Tank Storage",
                 color = dieselColor,
                 stockColor = stockColor,
-                exactStock = record.dieselTotal,
+                exactStock = record.currentDieselStorage,
+                lastDipTime = record.lastDieselDipTime,
                 cumulativeRefill = record.dieselRefill,
                 cumulativeShortage = record.dieselShortage,
                 currentStorage = record.currentDieselStorage,
                 lastRefill = record.lastDieselRefill,
+                lastShortage = record.lastDieselShortage,
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val isFirstEntry = record.dieselRefill == 0.0 && record.dieselShortage == 0.0 && record.totalDieselSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(dieselTotal = clampedVal))
+                        onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
                     } else {
                         if (diff > 100.0) {
                             onRecordChanged(
                                 record.copy(
                                     dieselTotal = clampedVal,
                                     dieselRefill = record.dieselRefill + diff,
-                                    lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr)
+                                    lastDieselRefill = RefillEvent(amount = diff, timestamp = nowStr),
+                                    lastDieselDipTime = nowStr
                                 )
                             )
                         } else if (diff < 0.0) {
@@ -438,11 +448,13 @@ fun HomeScreenContent(
                             onRecordChanged(
                                 record.copy(
                                     dieselTotal = clampedVal,
-                                    dieselShortage = record.dieselShortage + shortage
+                                    dieselShortage = record.dieselShortage + shortage,
+                                    lastDieselShortage = ShortageEvent(amount = shortage, timestamp = nowStr),
+                                    lastDieselDipTime = nowStr
                                 )
                             )
                         } else {
-                            onRecordChanged(record.copy(dieselTotal = clampedVal))
+                            onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
                         }
                     }
                 },
@@ -459,12 +471,14 @@ fun HomeScreenContent(
                     )
                 },
                 onAddShortage = { addedShortage ->
+                    val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                     val newShortage = record.dieselShortage + max(0.0, addedShortage)
                     val newCalculatedStock = max(0.0, record.dieselTotal - addedShortage)
                     onRecordChanged(
                         record.copy(
                             dieselTotal = newCalculatedStock,
-                            dieselShortage = newShortage
+                            dieselShortage = newShortage,
+                            lastDieselShortage = ShortageEvent(amount = max(0.0, addedShortage), timestamp = nowStr)
                         )
                     )
                 },
@@ -636,18 +650,22 @@ fun FuelTankCard(
     color: Color,
     stockColor: Color,
     exactStock: Double,
+    lastDipTime: String,
     cumulativeRefill: Double,
     cumulativeShortage: Double,
     currentStorage: Double,
     lastRefill: RefillEvent,
+    lastShortage: ShortageEvent,
     onConfirmExactStock: (Double, Double) -> Unit,
     onAddRefill: (Double) -> Unit,
     onAddShortage: (Double) -> Unit,
     onUpdateLastRefill: (RefillEvent) -> Unit
 ) {
-    var pendingExactStockInput by remember(exactStock) {
+    var isEditingExactStock by remember { mutableStateOf(false) }
+    var pendingInput by remember(exactStock) {
         mutableStateOf(if (exactStock == 0.0) "" else if (exactStock % 1.0 == 0.0) exactStock.toLong().toString() else exactStock.toString())
     }
+
     var newRefillInput by remember { mutableStateOf("") }
     var newShortageInput by remember { mutableStateOf("") }
 
@@ -661,49 +679,87 @@ fun FuelTankCard(
         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = color, fontSize = 12.sp)
 
-            // Exact Stock Box + Check Save Button
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = pendingExactStockInput,
-                    onValueChange = { input ->
-                        if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
-                            pendingExactStockInput = input
-                        }
-                    },
-                    label = { Text("Exact Stock", fontSize = 8.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                    ),
-                    modifier = Modifier.weight(0.75f)
-                )
+            // Exact Stock Section
+            Column {
+                Text("Exact Stock:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
 
-                IconButton(
-                    onClick = {
-                        val parsed = max(0.0, pendingExactStockInput.toDoubleOrNull() ?: 0.0)
-                        if (parsed >= 0.0) {
-                            showConfirmationDialog = true
+                if (!isEditingExactStock) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "$exactStock L",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = stockColor,
+                            fontSize = 18.sp
+                        )
+
+                        IconButton(
+                            onClick = { isEditingExactStock = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Dip",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp)
+                            )
                         }
-                    },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Save Dip Reading",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = pendingInput,
+                            onValueChange = { input ->
+                                if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                    pendingInput = input
+                                }
+                            },
+                            label = { Text("Enter Dip", fontSize = 8.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        IconButton(
+                            onClick = {
+                                val parsed = max(0.0, pendingInput.toDoubleOrNull() ?: 0.0)
+                                if (parsed >= 0.0) {
+                                    showConfirmationDialog = true
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Save Dip",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
+
+                Text(
+                    text = if (lastDipTime.isNotBlank()) "Last Reading: $lastDipTime" else "Last Reading: None",
+                    fontSize = 8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Refill Section
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
                     value = newRefillInput,
@@ -726,6 +782,32 @@ fun FuelTankCard(
             }
             Text("Total Refilled: $cumulativeRefill L", fontSize = 10.sp, color = stockColor)
 
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        text = if (lastRefill.timestamp.isNotBlank()) "${lastRefill.amount} L @ ${lastRefill.timestamp}" else "None",
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { showEditLastRefillDialog = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Last Refill",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Shortage Section
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedTextField(
                     value = newShortageInput,
@@ -749,33 +831,18 @@ fun FuelTankCard(
             }
             Text("Total Shortage: $cumulativeShortage L", fontSize = 10.sp, color = Color(0xFFFF5252))
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Last Refill:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Text(
-                        text = if (lastRefill.timestamp.isNotBlank()) "${lastRefill.amount} L @ ${lastRefill.timestamp}" else "None",
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = { showEditLastRefillDialog = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Last Refill",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
+            Column {
+                Text("Last Shortage:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    text = if (lastShortage.timestamp.isNotBlank()) "${lastShortage.amount} L @ ${lastShortage.timestamp}" else "None",
+                    fontSize = 8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
+            // Current Stock Section
             Column {
                 Text("Current Stock:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(
@@ -789,7 +856,7 @@ fun FuelTankCard(
     }
 
     if (showConfirmationDialog) {
-        val targetVal = max(0.0, pendingExactStockInput.toDoubleOrNull() ?: currentStorage)
+        val targetVal = max(0.0, pendingInput.toDoubleOrNull() ?: currentStorage)
         val diff = targetVal - currentStorage
 
         AlertDialog(
@@ -824,7 +891,7 @@ fun FuelTankCard(
                     }
 
                     Text(
-                        text = "Current Stock will be synced to $targetVal Litres.",
+                        text = "Current & Exact Stock will be synced to $targetVal Litres.",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary
@@ -835,12 +902,18 @@ fun FuelTankCard(
                 TextButton(
                     onClick = {
                         showConfirmationDialog = false
+                        isEditingExactStock = false
                         onConfirmExactStock(targetVal, diff)
                     }
                 ) { Text("Confirm & Sync", fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmationDialog = false }) { Text("Cancel") }
+                TextButton(
+                    onClick = {
+                        showConfirmationDialog = false
+                        isEditingExactStock = false
+                    }
+                ) { Text("Cancel") }
             }
         )
     }
@@ -954,7 +1027,6 @@ fun NumberField(
         mutableStateOf(if (value == 0.0) "" else if (value % 1.0 == 0.0) value.toLong().toString() else value.toString())
     }
 
-    // MPD Close value cannot be less than Open value
     val isInvalidClose = label == "Close" && value > 0.0 && value < openValue
 
     OutlinedTextField(
