@@ -77,7 +77,12 @@ fun MainContainerScreen(
                     topInset = topInset,
                     bottomInset = bottomInset
                 )
-                1 -> PlaceholderTab("Sales Dashboard")
+                1 -> SalesScreen(
+                    currentRecord = record,
+                    onRecordChanged = onRecordChanged,
+                    topInset = topInset,
+                    bottomInset = bottomInset
+                )
                 2 -> PlaceholderTab("Reports & Analytics")
                 3 -> PlaceholderTab("Expenditure Tracker")
                 4 -> SettingsScreen(
@@ -334,7 +339,6 @@ fun HomeScreenContent(
     var showDatePicker by remember { mutableStateOf(false) }
     var showSaveFullDayDialog by remember { mutableStateOf(false) }
 
-    // Reset selected shift tab back to Shift 1 whenever a new record or date is loaded
     LaunchedEffect(record.date) {
         selectedShiftTab = 1
     }
@@ -803,6 +807,8 @@ fun HomeScreenContent(
                             date = nextDateStr,
                             petrolTotal = record.currentPetrolStorage,
                             dieselTotal = record.currentDieselStorage,
+                            petrolPrice = record.petrolPrice,
+                            dieselPrice = record.dieselPrice,
                             shift1 = nextDayShift1
                         )
 
