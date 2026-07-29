@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
@@ -25,6 +27,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.fuel.data.DailyFuelRecord
+import com.nh.fuel.data.DayShift
+import com.nh.fuel.data.DispenserShift
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -54,7 +58,6 @@ fun SalesScreen(
     var fromDateInput by remember { mutableStateOf(currentRecord.date) }
     var toDateInput by remember { mutableStateOf(currentRecord.date) }
 
-    // Fixed cursor jumping: local string state initialized once per record date
     var petrolPriceText by remember(currentRecord.date) { 
         mutableStateOf(if (currentRecord.petrolPrice == 0.0) "" else currentRecord.petrolPrice.toString()) 
     }
@@ -62,7 +65,6 @@ fun SalesScreen(
         mutableStateOf(if (currentRecord.dieselPrice == 0.0) "" else currentRecord.dieselPrice.toString()) 
     }
 
-    // Filter records based on active period tab
     val filteredRecords = remember(selectedPeriod, currentRecord, fromDateInput, toDateInput, allRecords) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val records = if (allRecords.none { it.date == currentRecord.date }) {
@@ -109,6 +111,22 @@ fun SalesScreen(
     val totalDieselRevenue = filteredRecords.sumOf { it.totalDieselRevenue }
     val grandTotalRevenue = totalPetrolRevenue + totalDieselRevenue
 
+    val totalCashCollected = filteredRecords.sumOf { it.dailyCashCollected }
+    val totalDigitalCollected = filteredRecords.sumOf { it.dailyDigitalCollected }
+    val totalCollected = filteredRecords.sumOf { it.dailyTotalCollected }
+    val totalMismatch = filteredRecords.sumOf { it.dailyMismatch }
+
+    // Navigation function to offset date by -1 or +1 days
+    fun navigateDate(daysOffset: Int) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val parsedDate = try { sdf.parse(currentRecord.date) ?: Date() } catch (e: Exception) { Date() }
+        val cal = Calendar.getInstance().apply {
+            time = parsedDate
+            add(Calendar.DAY_OF_MONTH, daysOffset)
+        }
+        onDateSelected(sdf.format(cal.time))
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -125,33 +143,49 @@ fun SalesScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        // Date selection header for DAY tab
+        // Previous Day / Next Day navigation header for DAY tab
         if (selectedPeriod == PeriodFilter.DAY) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                OutlinedButton(
+                    onClick = { navigateDate(-1) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Day", modifier = Modifier.size(16.dp))
+                    Text("Prev Day", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Viewing Date: ",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
                         text = currentRecord.date,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    IconButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Select Date",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
-                IconButton(onClick = { showDatePicker = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Select Date",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+
+                OutlinedButton(
+                    onClick = { navigateDate(1) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Next Day", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Day", modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -267,55 +301,53 @@ fun SalesScreen(
             }
         }
 
-        // Shift Breakdown Cards for single Day view
+        // Shift Breakdown Cards for single Day view with MPD 1 & MPD 2 Collection Inputs
         if (selectedPeriod == PeriodFilter.DAY) {
             Text(
-                text = "Shift Breakdown (${currentRecord.date}):",
+                text = "Shift Breakdown & Payment Collections (${currentRecord.date}):",
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                ShiftSalesCard(
-                    shiftTitle = "Shift 1",
-                    petrolLitre = currentRecord.shift1.petrolSale,
-                    petrolRupees = currentRecord.shift1PetrolRevenue,
-                    dieselLitre = currentRecord.shift1.dieselSale,
-                    dieselRupees = currentRecord.shift1DieselRevenue,
-                    totalRupees = currentRecord.shift1TotalRevenue,
-                    petrolColor = petrolColor,
-                    dieselColor = dieselColor,
-                    modifier = Modifier.weight(1f)
-                )
+            ShiftDetailedSalesBlock(
+                shiftTitle = "Shift 1",
+                shift = currentRecord.shift1,
+                petrolPrice = currentRecord.petrolPrice,
+                dieselPrice = currentRecord.dieselPrice,
+                petrolColor = petrolColor,
+                dieselColor = dieselColor,
+                onShiftUpdated = { updatedShift ->
+                    onRecordChanged(currentRecord.copy(shift1 = updatedShift))
+                }
+            )
 
-                ShiftSalesCard(
-                    shiftTitle = "Shift 2",
-                    petrolLitre = currentRecord.shift2.petrolSale,
-                    petrolRupees = currentRecord.shift2PetrolRevenue,
-                    dieselLitre = currentRecord.shift2.dieselSale,
-                    dieselRupees = currentRecord.shift2DieselRevenue,
-                    totalRupees = currentRecord.shift2TotalRevenue,
-                    petrolColor = petrolColor,
-                    dieselColor = dieselColor,
-                    modifier = Modifier.weight(1f)
-                )
+            ShiftDetailedSalesBlock(
+                shiftTitle = "Shift 2",
+                shift = currentRecord.shift2,
+                petrolPrice = currentRecord.petrolPrice,
+                dieselPrice = currentRecord.dieselPrice,
+                petrolColor = petrolColor,
+                dieselColor = dieselColor,
+                onShiftUpdated = { updatedShift ->
+                    onRecordChanged(currentRecord.copy(shift2 = updatedShift))
+                }
+            )
 
-                ShiftSalesCard(
-                    shiftTitle = "Shift 3",
-                    petrolLitre = currentRecord.shift3.petrolSale,
-                    petrolRupees = currentRecord.shift3PetrolRevenue,
-                    dieselLitre = currentRecord.shift3.dieselSale,
-                    dieselRupees = currentRecord.shift3DieselRevenue,
-                    totalRupees = currentRecord.shift3TotalRevenue,
-                    petrolColor = petrolColor,
-                    dieselColor = dieselColor,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            ShiftDetailedSalesBlock(
+                shiftTitle = "Shift 3",
+                shift = currentRecord.shift3,
+                petrolPrice = currentRecord.petrolPrice,
+                dieselPrice = currentRecord.dieselPrice,
+                petrolColor = petrolColor,
+                dieselColor = dieselColor,
+                onShiftUpdated = { updatedShift ->
+                    onRecordChanged(currentRecord.copy(shift3 = updatedShift))
+                }
+            )
         }
 
-        // Summary Card
+        // Summary Card with Collection & Mismatch Metrics
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
             modifier = Modifier
@@ -330,23 +362,53 @@ fun SalesScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "• Petrol Sold: $totalPetrolLitre Litres → ₹ ${String.format(Locale.getDefault(), "%.2f", totalPetrolRevenue)}",
+                    text = "• Petrol Sold: $totalPetrolLitre L → ₹ ${formatCurrency(totalPetrolRevenue)}",
                     fontWeight = FontWeight.Bold,
                     color = petrolColor,
                     fontSize = 12.sp
                 )
                 Text(
-                    text = "• Diesel Sold: $totalDieselLitre Litres → ₹ ${String.format(Locale.getDefault(), "%.2f", totalDieselRevenue)}",
+                    text = "• Diesel Sold: $totalDieselLitre L → ₹ ${formatCurrency(totalDieselRevenue)}",
                     fontWeight = FontWeight.Bold,
                     color = dieselColor,
                     fontSize = 12.sp
                 )
+                Text(
+                    text = "• Grand Calculated Revenue: ₹ ${formatCurrency(grandTotalRevenue)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
                 Text(
-                    text = "Grand Total Revenue: ₹ ${String.format(Locale.getDefault(), "%.2f", grandTotalRevenue)}",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 15.sp,
+                    text = "• Total Cash Collected: ₹ ${formatCurrency(totalCashCollected)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "• Total Digital Collected: ₹ ${formatCurrency(totalDigitalCollected)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "• Total Payment Collected: ₹ ${formatCurrency(totalCollected)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                val mismatchColor = when {
+                    totalMismatch > 0.0 -> Color(0xFF2E7D32)
+                    totalMismatch < 0.0 -> Color(0xFFC62828)
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+                Text(
+                    text = "Net Mismatch: ${formatSignedCurrency(totalMismatch)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    color = mismatchColor
                 )
             }
         }
@@ -369,49 +431,205 @@ fun SalesScreen(
 }
 
 @Composable
-private fun ShiftSalesCard(
+private fun ShiftDetailedSalesBlock(
     shiftTitle: String,
-    petrolLitre: Double,
-    petrolRupees: Double,
-    dieselLitre: Double,
-    dieselRupees: Double,
-    totalRupees: Double,
+    shift: DayShift,
+    petrolPrice: Double,
+    dieselPrice: Double,
     petrolColor: Color,
     dieselColor: Color,
-    modifier: Modifier = Modifier
+    onShiftUpdated: (DayShift) -> Unit
 ) {
+    val shiftRevenue = shift.getRevenue(petrolPrice, dieselPrice)
+    val shiftMismatch = shift.getMismatch(petrolPrice, dieselPrice)
+
     Card(
-        modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(shiftTitle, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(shiftTitle, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    text = "Shift Revenue: ₹ ${formatCurrency(shiftRevenue)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
-            Text("Petrol:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = petrolColor)
-            Text("${petrolLitre}L", fontSize = 9.sp)
-            Text("₹ ${String.format(Locale.getDefault(), "%.1f", petrolRupees)}", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = petrolColor)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // MPD 1 Column
+                MpdSalesColumn(
+                    mpdTitle = "MPD 1",
+                    dispenser = shift.mpd1,
+                    petrolPrice = petrolPrice,
+                    dieselPrice = dieselPrice,
+                    petrolColor = petrolColor,
+                    dieselColor = dieselColor,
+                    modifier = Modifier.weight(1f),
+                    onDispenserUpdated = { updatedMpd1 ->
+                        onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
+                    }
+                )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 1.dp))
+                // MPD 2 Column
+                MpdSalesColumn(
+                    mpdTitle = "MPD 2",
+                    dispenser = shift.mpd2,
+                    petrolPrice = petrolPrice,
+                    dieselPrice = dieselPrice,
+                    petrolColor = petrolColor,
+                    dieselColor = dieselColor,
+                    modifier = Modifier.weight(1f),
+                    onDispenserUpdated = { updatedMpd2 ->
+                        onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
+                    }
+                )
+            }
 
-            Text("Diesel:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = dieselColor)
-            Text("${dieselLitre}L", fontSize = 9.sp)
-            Text("₹ ${String.format(Locale.getDefault(), "%.1f", dieselRupees)}", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = dieselColor)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 1.dp))
+            val mismatchColor = when {
+                shiftMismatch > 0.0 -> Color(0xFF2E7D32)
+                shiftMismatch < 0.0 -> Color(0xFFC62828)
+                else -> MaterialTheme.colorScheme.onSurface
+            }
 
-            Text("Total ₹:", fontWeight = FontWeight.Bold, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
-            Text("₹ ${String.format(Locale.getDefault(), "%.1f", totalRupees)}", fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Shift Collected: ₹ ${formatCurrency(shift.totalCollected)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Shift Mismatch: ${formatSignedCurrency(shiftMismatch)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 11.sp,
+                    color = mismatchColor
+                )
+            }
         }
     }
 }
 
+@Composable
+private fun MpdSalesColumn(
+    mpdTitle: String,
+    dispenser: DispenserShift,
+    petrolPrice: Double,
+    dieselPrice: Double,
+    petrolColor: Color,
+    dieselColor: Color,
+    modifier: Modifier = Modifier,
+    onDispenserUpdated: (DispenserShift) -> Unit
+) {
+    val petrolRev = dispenser.petrolSale * petrolPrice
+    val dieselRev = dispenser.dieselSale * dieselPrice
+    val mpdRevenue = petrolRev + dieselRev
+    val mpdMismatch = dispenser.getMismatch(petrolPrice, dieselPrice)
+
+    var cashText by remember(dispenser.cashCollected) {
+        mutableStateOf(if (dispenser.cashCollected == 0.0) "" else dispenser.cashCollected.toString())
+    }
+    var digitalText by remember(dispenser.digitalCollected) {
+        mutableStateOf(if (dispenser.digitalCollected == 0.0) "" else dispenser.digitalCollected.toString())
+    }
+
+    Card(
+        modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(mpdTitle, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+
+            Text("Petrol (${dispenser.petrolSale} L): ₹ ${formatCurrency(petrolRev)}", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = petrolColor)
+            Text("Diesel (${dispenser.dieselSale} L): ₹ ${formatCurrency(dieselRev)}", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = dieselColor)
+            Text("MPD Revenue: ₹ ${formatCurrency(mpdRevenue)}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 1.dp))
+
+            // Cash and Digital editable payment boxes
+            OutlinedTextField(
+                value = cashText,
+                onValueChange = { input ->
+                    if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        cashText = input
+                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        onDispenserUpdated(dispenser.copy(cashCollected = parsed))
+                    }
+                },
+                label = { Text("Cash ₹", fontSize = 8.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = digitalText,
+                onValueChange = { input ->
+                    if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        digitalText = input
+                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        onDispenserUpdated(dispenser.copy(digitalCollected = parsed))
+                    }
+                },
+                label = { Text("Digital ₹", fontSize = 8.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            val mismatchColor = when {
+                mpdMismatch > 0.0 -> Color(0xFF2E7D32)
+                mpdMismatch < 0.0 -> Color(0xFFC62828)
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+
+            Text(
+                text = "Collected: ₹ ${formatCurrency(dispenser.totalCollected)}",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Mismatch: ${formatSignedCurrency(mpdMismatch)}",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = mismatchColor
+            )
+        }
+    }
+}
+
+private fun formatCurrency(amount: Double): String {
+    return String.format(Locale.getDefault(), "%.2f", amount)
+}
+
+private fun formatSignedCurrency(amount: Double): String {
+    val sign = if (amount > 0.0) "+" else ""
+    return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
+}
+
+/** Aggregated daily CSV export with Revenue, Cash, Digital, Total Collected, and Net Mismatch */
 private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>) {
-    val csvHeader = "Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Total Revenue (Rs)\n"
+    val csvHeader = "Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n"
     val csvBody = StringBuilder()
 
     records.forEach { record ->
         csvBody.append(
-            "${record.date},${record.totalPetrolSell},${record.petrolPrice},${record.totalPetrolRevenue},${record.totalDieselSell},${record.dieselPrice},${record.totalDieselRevenue},${record.grandTotalRevenue}\n"
+            "${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},${formatSignedCurrency(record.dailyMismatch)}\n"
         )
     }
 
