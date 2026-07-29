@@ -41,6 +41,7 @@ import kotlin.math.max
 @Composable
 fun MainContainerScreen(
     record: DailyFuelRecord,
+    allRecords: List<DailyFuelRecord> = emptyList(),
     allExpenses: List<ExpenseItem> = emptyList(),
     navBarOpacity: Float,
     themeMode: ThemeMode,
@@ -82,6 +83,7 @@ fun MainContainerScreen(
                 )
                 1 -> SalesScreen(
                     currentRecord = record,
+                    allRecords = allRecords,
                     onRecordChanged = onRecordChanged,
                     onDateSelected = onDateSelected,
                     topInset = topInset,
