@@ -24,17 +24,10 @@ import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-
     private lateinit var database: FuelDatabase
     private lateinit var appPreferences: AppPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Must run before super.onCreate()/setContent — this is what actually
-        // tells the window to draw content behind the status/nav bars and
-        // makes both of them transparent. Calling it later (e.g. from a
-        // LaunchedEffect once composition has already started) is too late:
-        // the window has already been laid out with opaque system bars by
-        // then, which is why they were showing up solid instead of glass.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
@@ -57,9 +50,6 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.AUTO -> isSystemInDarkTheme()
             }
 
-            // The system bars are already transparent (set once above); this
-            // just keeps their icon color legible whenever the in-app theme
-            // toggle changes, without re-doing the edge-to-edge window setup.
             LaunchedEffect(isDarkTheme) {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !isDarkTheme
@@ -78,12 +68,16 @@ class MainActivity : ComponentActivity() {
                 val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
                 val currentRecord = recordFlow.value ?: DailyFuelRecord(date = currentDate)
 
+                val expensesFlow = database.expenseDao().getAllExpenses().collectAsState(initial = emptyList())
+                val allExpenses = expensesFlow.value
+
                 val navBarOpacity by appPreferences.opacityFlow.collectAsState(
                     initial = AppPreferences.DEFAULT_GLASS_OPACITY
                 )
 
                 MainContainerScreen(
                     record = currentRecord,
+                    allExpenses = allExpenses,
                     navBarOpacity = navBarOpacity,
                     themeMode = themeMode,
                     onRecordChanged = { updatedRecord ->
@@ -102,6 +96,16 @@ class MainActivity : ComponentActivity() {
                     onThemeModeChanged = { newTheme ->
                         coroutineScope.launch {
                             appPreferences.saveThemeMode(newTheme)
+                        }
+                    },
+                    onAddOrUpdateExpense = { expenseItem ->
+                        coroutineScope.launch {
+                            database.expenseDao().insertOrUpdate(expenseItem)
+                        }
+                    },
+                    onDeleteExpense = { expenseItem ->
+                        coroutineScope.launch {
+                            database.expenseDao().deleteExpense(expenseItem)
                         }
                     }
                 )
