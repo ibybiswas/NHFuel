@@ -14,7 +14,10 @@ import androidx.compose.runtime.*
 import androidx.core.view.WindowCompat
 import androidx.room.Room
 import com.nh.fuel.data.DailyFuelRecord
+import com.nh.fuel.data.DayShift
+import com.nh.fuel.data.DispenserShift
 import com.nh.fuel.data.FuelDatabase
+import com.nh.fuel.data.NozzleShift
 import com.nh.fuel.ui.AppPreferences
 import com.nh.fuel.ui.MainContainerScreen
 import com.nh.fuel.ui.ThemeMode
@@ -66,7 +69,52 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
-                val currentRecord = recordFlow.value ?: DailyFuelRecord(date = currentDate)
+                val dbRecord = recordFlow.value
+
+                val allRecordsFlow = database.fuelDao().getAllRecords().collectAsState(initial = emptyList())
+                val allRecords = allRecordsFlow.value
+
+                val currentRecord = remember(dbRecord, currentDate, allRecords) {
+                    if (dbRecord != null) {
+                        dbRecord
+                    } else {
+                        val previousRecord = allRecords
+                            .filter { it.date < currentDate }
+                            .maxByOrNull { it.date }
+
+                        if (previousRecord != null) {
+                            val lastShift3Mpd1 = previousRecord.shift3.mpd1
+                            val lastShift3Mpd2 = previousRecord.shift3.mpd2
+
+                            val carriedShift1 = DayShift(
+                                shiftNumber = 1,
+                                mpd1 = DispenserShift(
+                                    petrolN2 = NozzleShift(open = if (lastShift3Mpd1.petrolN2.isClosed) lastShift3Mpd1.petrolN2.close else previousRecord.shift1.mpd1.petrolN2.open),
+                                    petrolN3 = NozzleShift(open = if (lastShift3Mpd1.petrolN3.isClosed) lastShift3Mpd1.petrolN3.close else previousRecord.shift1.mpd1.petrolN3.open),
+                                    dieselN1 = NozzleShift(open = if (lastShift3Mpd1.dieselN1.isClosed) lastShift3Mpd1.dieselN1.close else previousRecord.shift1.mpd1.dieselN1.open),
+                                    dieselN4 = NozzleShift(open = if (lastShift3Mpd1.dieselN4.isClosed) lastShift3Mpd1.dieselN4.close else previousRecord.shift1.mpd1.dieselN4.open)
+                                ),
+                                mpd2 = DispenserShift(
+                                    petrolN2 = NozzleShift(open = if (lastShift3Mpd2.petrolN2.isClosed) lastShift3Mpd2.petrolN2.close else previousRecord.shift1.mpd2.petrolN2.open),
+                                    petrolN3 = NozzleShift(open = if (lastShift3Mpd2.petrolN3.isClosed) lastShift3Mpd2.petrolN3.close else previousRecord.shift1.mpd2.petrolN3.open),
+                                    dieselN1 = NozzleShift(open = if (lastShift3Mpd2.dieselN1.isClosed) lastShift3Mpd2.dieselN1.close else previousRecord.shift1.mpd2.dieselN1.open),
+                                    dieselN4 = NozzleShift(open = if (lastShift3Mpd2.dieselN4.isClosed) lastShift3Mpd2.dieselN4.close else previousRecord.shift1.mpd2.dieselN4.open)
+                                )
+                            )
+
+                            DailyFuelRecord(
+                                date = currentDate,
+                                petrolTotal = previousRecord.currentPetrolStorage,
+                                dieselTotal = previousRecord.currentDieselStorage,
+                                petrolPrice = previousRecord.petrolPrice,
+                                dieselPrice = previousRecord.dieselPrice,
+                                shift1 = carriedShift1
+                            )
+                        } else {
+                            DailyFuelRecord(date = currentDate)
+                        }
+                    }
+                }
 
                 val expensesFlow = database.expenseDao().getAllExpenses().collectAsState(initial = emptyList())
                 val allExpenses = expensesFlow.value
@@ -77,6 +125,7 @@ class MainActivity : ComponentActivity() {
 
                 MainContainerScreen(
                     record = currentRecord,
+                    allRecords = allRecords,
                     allExpenses = allExpenses,
                     navBarOpacity = navBarOpacity,
                     themeMode = themeMode,
