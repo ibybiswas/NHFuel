@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.nh.fuel.data.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
@@ -331,6 +332,7 @@ fun HomeScreenContent(
 ) {
     var selectedShiftTab by remember { mutableStateOf(1) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showSaveFullDayDialog by remember { mutableStateOf(false) }
 
     val isDark = isSystemInDarkTheme()
     val petrolColor = if (isDark) Color(0xFFFF8A80) else Color(0xFFC62828)
@@ -603,6 +605,7 @@ fun HomeScreenContent(
 
         ShiftInputBlock(
             shiftTitle = "Shift $selectedShiftTab Readings",
+            shiftNumber = selectedShiftTab,
             shift = activeShift,
             petrolColor = petrolColor,
             dieselColor = dieselColor,
@@ -712,7 +715,114 @@ fun HomeScreenContent(
             }
         }
 
+        // Save & Finalize Full Day Button (appears after Shift 3 is complete)
+        if (record.shift3.isComplete) {
+            Button(
+                onClick = { showSaveFullDayDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Save,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Save & Finalize Full Day Sales",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
         Spacer(Modifier.height(bottomInset + 4.dp))
+    }
+
+    // Confirmation Popup for Saving Full Day Cycle
+    if (showSaveFullDayDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveFullDayDialog = false },
+            title = {
+                Text(
+                    text = "Save Full Day Sales (${record.date})?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "This will finalize and lock the 24-hour cycle for ${record.date}.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Shift 3 close readings will automatically carry forward as opening meter values for the next business date.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSaveFullDayDialog = false
+                        
+                        // Parse current date & compute next day string
+                        val sdf = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault())
+                        val parsedDate = try { sdf.parse(record.date) } catch (e: Exception) { Date() }
+                        val cal = Calendar.getInstance().apply {
+                            time = parsedDate ?: Date()
+                            add(Calendar.DAY_OF_MONTH, 1)
+                        }
+                        val nextDateStr = sdf.format(cal.time)
+
+                        // Closing values of Shift 3 carry forward as Shift 1 Open values for next day
+                        val s3Mpd1 = record.shift3.mpd1
+                        val s3Mpd2 = record.shift3.mpd2
+
+                        val nextDayShift1 = DayShift(
+                            shiftNumber = 1,
+                            mpd1 = DispenserShift(
+                                petrolN2 = NozzleShift(open = s3Mpd1.petrolN2.close),
+                                petrolN3 = NozzleShift(open = s3Mpd1.petrolN3.close),
+                                dieselN1 = NozzleShift(open = s3Mpd1.dieselN1.close),
+                                dieselN4 = NozzleShift(open = s3Mpd1.dieselN4.close)
+                            ),
+                            mpd2 = DispenserShift(
+                                petrolN2 = NozzleShift(open = s3Mpd2.petrolN2.close),
+                                petrolN3 = NozzleShift(open = s3Mpd2.petrolN3.close),
+                                dieselN1 = NozzleShift(open = s3Mpd2.dieselN1.close),
+                                dieselN4 = NozzleShift(open = s3Mpd2.dieselN4.close)
+                            )
+                        )
+
+                        val newNextDayRecord = DailyFuelRecord(
+                            date = nextDateStr,
+                            petrolTotal = record.currentPetrolStorage,
+                            dieselTotal = record.currentDieselStorage,
+                            shift1 = nextDayShift1
+                        )
+
+                        // Persist saved record & navigate to next date
+                        onRecordChanged(record)
+                        onRecordChanged(newNextDayRecord)
+                        onDateSelected(nextDateStr)
+                    }
+                ) {
+                    Text("Confirm & Save", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveFullDayDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -1062,19 +1172,142 @@ fun FuelTankCard(
 @Composable
 fun ShiftInputBlock(
     shiftTitle: String,
+    shiftNumber: Int,
     shift: DayShift,
     petrolColor: Color,
     dieselColor: Color,
     onShiftUpdated: (DayShift) -> Unit
 ) {
+    var showSkipWarningDialog by remember { mutableStateOf(false) }
+    var countdown by remember { mutableStateOf(5) }
+
+    // Check if close readings have been entered anywhere in this shift
+    val hasCloseValueEntered = shift.mpd1.petrolN2.close > 0.0 || shift.mpd1.petrolN3.close > 0.0 ||
+        shift.mpd1.dieselN1.close > 0.0 || shift.mpd1.dieselN4.close > 0.0 ||
+        shift.mpd2.petrolN2.close > 0.0 || shift.mpd2.petrolN3.close > 0.0 ||
+        shift.mpd2.dieselN1.close > 0.0 || shift.mpd2.dieselN4.close > 0.0
+
+    // Countdown Timer Effect when Skip dialog is active
+    LaunchedEffect(showSkipWarningDialog) {
+        if (showSkipWarningDialog) {
+            countdown = 5
+            while (countdown > 0) {
+                delay(1000)
+                countdown--
+            }
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(shiftTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = shiftTitle,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            // Skip button: Only visible if no close meter value has been entered
+            if (!hasCloseValueEntered && !shift.isComplete) {
+                OutlinedButton(
+                    onClick = { showSkipWarningDialog = true },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Skip Shift",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Skip Shift",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
         DispenserShiftCard("MPD 1", shift.mpd1, petrolColor, dieselColor) { updatedMpd1 ->
             onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
         }
         DispenserShiftCard("MPD 2", shift.mpd2, petrolColor, dieselColor) { updatedMpd2 ->
             onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
         }
+    }
+
+    // Skip Shift Warning Dialog with 5-Second Countdown
+    if (showSkipWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showSkipWarningDialog = false },
+            title = {
+                Text(
+                    text = "Skip Shift $shiftNumber?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "This action is used for zero-sales shifts due to holidays or pump closure.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "• All nozzle CLOSE meter readings will be set equal to OPEN readings.\n• Total fuel sales for Shift $shiftNumber will evaluate to 0 Litres.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = countdown == 0,
+                    onClick = {
+                        showSkipWarningDialog = false
+
+                        // Automatically populate close = open for all nozzles
+                        val skippedMpd1 = shift.mpd1.copy(
+                            petrolN2 = shift.mpd1.petrolN2.copy(close = shift.mpd1.petrolN2.open),
+                            petrolN3 = shift.mpd1.petrolN3.copy(close = shift.mpd1.petrolN3.open),
+                            dieselN1 = shift.mpd1.dieselN1.copy(close = shift.mpd1.dieselN1.open),
+                            dieselN4 = shift.mpd1.dieselN4.copy(close = shift.mpd1.dieselN4.open)
+                        )
+                        val skippedMpd2 = shift.mpd2.copy(
+                            petrolN2 = shift.mpd2.petrolN2.copy(close = shift.mpd2.petrolN2.open),
+                            petrolN3 = shift.mpd2.petrolN3.copy(close = shift.mpd2.petrolN3.open),
+                            dieselN1 = shift.mpd2.dieselN1.copy(close = shift.mpd2.dieselN1.open),
+                            dieselN4 = shift.mpd2.dieselN4.copy(close = shift.mpd2.dieselN4.open)
+                        )
+
+                        onShiftUpdated(
+                            shift.copy(
+                                mpd1 = skippedMpd1,
+                                mpd2 = skippedMpd2
+                            )
+                        )
+                    }
+                ) {
+                    Text(
+                        text = if (countdown > 0) "Confirm ($countdown s)" else "Confirm Skip",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSkipWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
