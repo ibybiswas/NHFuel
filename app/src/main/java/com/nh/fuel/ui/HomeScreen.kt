@@ -407,6 +407,7 @@ fun HomeScreenContent(
                 color = petrolColor,
                 stockColor = stockColor,
                 exactStock = record.currentPetrolStorage,
+                lastDipAmount = record.lastPetrolDipAmount,
                 lastDipTime = record.lastPetrolDipTime,
                 cumulativeRefill = record.petrolRefill,
                 cumulativeVariation = record.petrolVariation,
@@ -420,7 +421,13 @@ fun HomeScreenContent(
                     val isFirstEntry = record.petrolRefill == 0.0 && record.petrolVariation == 0.0 && record.totalPetrolSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(petrolTotal = clampedVal, lastPetrolDipTime = nowStr))
+                        onRecordChanged(
+                            record.copy(
+                                petrolTotal = clampedVal,
+                                lastPetrolDipAmount = clampedVal,
+                                lastPetrolDipTime = nowStr
+                            )
+                        )
                     } else if (diff != 0.0) {
                         val newVariation = record.petrolVariation + diff
                         val requiredTotal = clampedVal + record.totalPetrolSell - record.petrolRefill - newVariation
@@ -430,13 +437,31 @@ fun HomeScreenContent(
                                 petrolVariation = newVariation,
                                 lastPetrolVariationAmount = diff,
                                 lastPetrolVariationTime = nowStr,
+                                lastPetrolDipAmount = clampedVal,
                                 lastPetrolDipTime = nowStr
                             )
                         )
                     } else {
                         val requiredTotal = clampedVal + record.totalPetrolSell - record.petrolRefill - record.petrolVariation
-                        onRecordChanged(record.copy(petrolTotal = max(0.0, requiredTotal), lastPetrolDipTime = nowStr))
+                        onRecordChanged(
+                            record.copy(
+                                petrolTotal = max(0.0, requiredTotal),
+                                lastPetrolDipAmount = clampedVal,
+                                lastPetrolDipTime = nowStr
+                            )
+                        )
                     }
+                },
+                onUndoExactStock = {
+                    onRecordChanged(
+                        record.copy(
+                            petrolVariation = record.petrolVariation - record.lastPetrolVariationAmount,
+                            lastPetrolVariationAmount = 0.0,
+                            lastPetrolVariationTime = "",
+                            lastPetrolDipAmount = 0.0,
+                            lastPetrolDipTime = ""
+                        )
+                    )
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
@@ -450,8 +475,15 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onUpdateLastRefill = { updatedRefill ->
-                    onRecordChanged(record.copy(lastPetrolRefill = updatedRefill))
+                onUndoLastRefill = {
+                    val lastAmount = record.lastPetrolRefill.amount
+                    onRecordChanged(
+                        record.copy(
+                            petrolTotal = max(0.0, record.petrolTotal - lastAmount),
+                            petrolRefill = max(0.0, record.petrolRefill - lastAmount),
+                            lastPetrolRefill = RefillEvent()
+                        )
+                    )
                 }
             )
 
@@ -462,6 +494,7 @@ fun HomeScreenContent(
                 color = dieselColor,
                 stockColor = stockColor,
                 exactStock = record.currentDieselStorage,
+                lastDipAmount = record.lastDieselDipAmount,
                 lastDipTime = record.lastDieselDipTime,
                 cumulativeRefill = record.dieselRefill,
                 cumulativeVariation = record.dieselVariation,
@@ -475,7 +508,13 @@ fun HomeScreenContent(
                     val isFirstEntry = record.dieselRefill == 0.0 && record.dieselVariation == 0.0 && record.totalDieselSell == 0.0
 
                     if (isFirstEntry) {
-                        onRecordChanged(record.copy(dieselTotal = clampedVal, lastDieselDipTime = nowStr))
+                        onRecordChanged(
+                            record.copy(
+                                dieselTotal = clampedVal,
+                                lastDieselDipAmount = clampedVal,
+                                lastDieselDipTime = nowStr
+                            )
+                        )
                     } else if (diff != 0.0) {
                         val newVariation = record.dieselVariation + diff
                         val requiredTotal = clampedVal + record.totalDieselSell - record.dieselRefill - newVariation
@@ -485,13 +524,31 @@ fun HomeScreenContent(
                                 dieselVariation = newVariation,
                                 lastDieselVariationAmount = diff,
                                 lastDieselVariationTime = nowStr,
+                                lastDieselDipAmount = clampedVal,
                                 lastDieselDipTime = nowStr
                             )
                         )
                     } else {
                         val requiredTotal = clampedVal + record.totalDieselSell - record.dieselRefill - record.dieselVariation
-                        onRecordChanged(record.copy(dieselTotal = max(0.0, requiredTotal), lastDieselDipTime = nowStr))
+                        onRecordChanged(
+                            record.copy(
+                                dieselTotal = max(0.0, requiredTotal),
+                                lastDieselDipAmount = clampedVal,
+                                lastDieselDipTime = nowStr
+                            )
+                        )
                     }
+                },
+                onUndoExactStock = {
+                    onRecordChanged(
+                        record.copy(
+                            dieselVariation = record.dieselVariation - record.lastDieselVariationAmount,
+                            lastDieselVariationAmount = 0.0,
+                            lastDieselVariationTime = "",
+                            lastDieselDipAmount = 0.0,
+                            lastDieselDipTime = ""
+                        )
+                    )
                 },
                 onAddRefill = { addedLitre ->
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
@@ -505,8 +562,15 @@ fun HomeScreenContent(
                         )
                     )
                 },
-                onUpdateLastRefill = { updatedRefill ->
-                    onRecordChanged(record.copy(lastDieselRefill = updatedRefill))
+                onUndoLastRefill = {
+                    val lastAmount = record.lastDieselRefill.amount
+                    onRecordChanged(
+                        record.copy(
+                            dieselTotal = max(0.0, record.dieselTotal - lastAmount),
+                            dieselRefill = max(0.0, record.dieselRefill - lastAmount),
+                            lastDieselRefill = RefillEvent()
+                        )
+                    )
                 }
             )
         }
@@ -669,6 +733,7 @@ fun FuelTankCard(
     color: Color,
     stockColor: Color,
     exactStock: Double,
+    lastDipAmount: Double,
     lastDipTime: String,
     cumulativeRefill: Double,
     cumulativeVariation: Double,
@@ -677,8 +742,9 @@ fun FuelTankCard(
     lastVariationAmount: Double,
     lastVariationTime: String,
     onConfirmExactStock: (Double, Double) -> Unit,
+    onUndoExactStock: () -> Unit,
     onAddRefill: (Double) -> Unit,
-    onUpdateLastRefill: (RefillEvent) -> Unit
+    onUndoLastRefill: () -> Unit
 ) {
     var isEditingExactStock by remember { mutableStateOf(false) }
     var pendingInput by remember(exactStock) {
@@ -686,7 +752,8 @@ fun FuelTankCard(
     }
     var newRefillInput by remember { mutableStateOf("") }
     var showConfirmationDialog by remember { mutableStateOf(false) }
-    var showEditLastRefillDialog by remember { mutableStateOf(false) }
+    var showUndoDipDialog by remember { mutableStateOf(false) }
+    var showUndoRefillDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
@@ -701,7 +768,7 @@ fun FuelTankCard(
                 if (!isEditingExactStock) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.Start,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -710,9 +777,10 @@ fun FuelTankCard(
                             color = stockColor,
                             fontSize = 18.sp
                         )
+                        Spacer(Modifier.width(4.dp))
                         IconButton(
                             onClick = { isEditingExactStock = true },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
@@ -762,11 +830,32 @@ fun FuelTankCard(
                         }
                     }
                 }
-                Text(
-                    text = if (lastDipTime.isNotBlank()) "Last Reading: $lastDipTime" else "Last Reading: None",
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (lastDipTime.isNotBlank()) "Last Reading: $lastDipAmount L @ $lastDipTime" else "Last Reading: None",
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (lastDipTime.isNotBlank()) {
+                        IconButton(
+                            onClick = { showUndoDipDialog = true },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Undo,
+                                contentDescription = "Undo Exact Dip Reading",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -807,13 +896,18 @@ fun FuelTankCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = { showEditLastRefillDialog = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Last Refill",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(13.dp)
-                    )
+                if (lastRefill.timestamp.isNotBlank()) {
+                    IconButton(
+                        onClick = { showUndoRefillDialog = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Undo,
+                            contentDescription = "Undo Last Refill",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
             }
 
@@ -916,27 +1010,50 @@ fun FuelTankCard(
         )
     }
 
-    if (showEditLastRefillDialog) {
-        var editAmount by remember { mutableStateOf(lastRefill.amount.toString()) }
-        var editTime by remember { mutableStateOf(lastRefill.timestamp) }
-
+    if (showUndoDipDialog) {
         AlertDialog(
-            onDismissRequest = { showEditLastRefillDialog = false },
-            title = { Text("Edit Last Refill Details", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface) },
+            onDismissRequest = { showUndoDipDialog = false },
+            title = { Text("Undo Last Dip Reading?", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = editAmount, onValueChange = { editAmount = it }, label = { Text("Refill Litre") })
-                    OutlinedTextField(value = editTime, onValueChange = { editTime = it }, label = { Text("Date & Time") })
-                }
+                Text(
+                    text = "Are you sure you want to revert the reading ($lastDipAmount L @ $lastDipTime)? This will remove its associated variation ($lastVariationAmount L) and restore previous stock states.",
+                    fontSize = 12.sp
+                )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showEditLastRefillDialog = false
-                    onUpdateLastRefill(RefillEvent(amount = max(0.0, editAmount.toDoubleOrNull() ?: 0.0), timestamp = editTime))
-                }) { Text("Save") }
+                TextButton(
+                    onClick = {
+                        showUndoDipDialog = false
+                        onUndoExactStock()
+                    }
+                ) { Text("Undo Reading", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showEditLastRefillDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showUndoDipDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showUndoRefillDialog) {
+        AlertDialog(
+            onDismissRequest = { showUndoRefillDialog = false },
+            title = { Text("Undo Last Refill?", fontSize = 15.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Are you sure you want to revert the last refill delivery of ${lastRefill.amount} L added on ${lastRefill.timestamp}? This will deduct ${lastRefill.amount} L from current stock and refilled total.",
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUndoRefillDialog = false
+                        onUndoLastRefill()
+                    }
+                ) { Text("Undo Refill", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUndoRefillDialog = false }) { Text("Cancel") }
             }
         )
     }
