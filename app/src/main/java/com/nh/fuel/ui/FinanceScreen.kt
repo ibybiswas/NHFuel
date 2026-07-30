@@ -91,6 +91,118 @@ fun FinanceScreen(
     }
 }
 
+@Composable
+fun ExpendScreenContent(
+    currentRecordDate: String,
+    allExpenses: List<ExpenseItem>,
+    onAddOrUpdateExpense: (ExpenseItem) -> Unit,
+    onDeleteExpense: (ExpenseItem) -> Unit,
+    bottomInset: Dp
+) {
+    var titleInput by remember { mutableStateOf("") }
+    var amountInput by remember { mutableStateOf("") }
+    var categoryInput by remember { mutableStateOf("General") }
+
+    val dayExpenses = remember(allExpenses, currentRecordDate) {
+        allExpenses.filter { it.date == currentRecordDate }
+    }
+    val totalDayExpense = remember(dayExpenses) {
+        dayExpenses.sumOf { it.amount }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text("Total Expenses ($currentRecordDate)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("₹ ${String.format(Locale.getDefault(), "%.2f", totalDayExpense)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Add New Expense", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = titleInput,
+                        onValueChange = { titleInput = it },
+                        label = { Text("Expense Title", fontSize = 9.sp) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = amountInput,
+                        onValueChange = { amountInput = it },
+                        label = { Text("Amount (₹)", fontSize = 9.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Button(
+                    onClick = {
+                        val amount = amountInput.toDoubleOrNull() ?: 0.0
+                        if (titleInput.isNotBlank() && amount > 0.0) {
+                            onAddOrUpdateExpense(
+                                ExpenseItem(
+                                    date = currentRecordDate,
+                                    title = titleInput.trim(),
+                                    amount = amount,
+                                    category = categoryInput
+                                )
+                            )
+                            titleInput = ""
+                            amountInput = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text("Add Expense", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = bottomInset + 8.dp)
+        ) {
+            items(dayExpenses, key = { it.id }) { item ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(item.title, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Category: ${item.category}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+                            IconButton(onClick = { onDeleteExpense(item) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Expense", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreditLedgerContent(
@@ -101,7 +213,7 @@ private fun CreditLedgerContent(
     bottomInset: Dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf(CreditStatus.UNPAID) } // Default show pending
+    var selectedFilter by remember { mutableStateOf(CreditStatus.UNPAID) }
     var showAddCreditDialog by remember { mutableStateOf(false) }
     var creditToSettle by remember { mutableStateOf<CreditRecord?>(null) }
 
@@ -130,7 +242,6 @@ private fun CreditLedgerContent(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Summary Cards
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -156,7 +267,6 @@ private fun CreditLedgerContent(
             }
         }
 
-        // Search & Filter
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
