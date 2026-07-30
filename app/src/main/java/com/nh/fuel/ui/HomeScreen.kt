@@ -771,7 +771,7 @@ fun HomeScreenContent(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Shift 3 close readings will automatically carry forward as opening meter values for the next business date.",
+                        text = "Shift 3 close readings, stock levels, cumulative refills, and variations will carry forward to the next business date.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -809,10 +809,25 @@ fun HomeScreenContent(
                             )
                         )
 
+                        // Accurately carry forward ending stock levels, refills, and variations
                         val newNextDayRecord = DailyFuelRecord(
                             date = nextDateStr,
                             petrolTotal = record.currentPetrolStorage,
+                            petrolRefill = record.petrolRefill,
+                            petrolVariation = record.petrolVariation,
+                            lastPetrolRefill = record.lastPetrolRefill,
+                            lastPetrolVariationAmount = record.lastPetrolVariationAmount,
+                            lastPetrolVariationTime = record.lastPetrolVariationTime,
+                            lastPetrolDipAmount = record.lastPetrolDipAmount,
+                            lastPetrolDipTime = record.lastPetrolDipTime,
                             dieselTotal = record.currentDieselStorage,
+                            dieselRefill = record.dieselRefill,
+                            dieselVariation = record.dieselVariation,
+                            lastDieselRefill = record.lastDieselRefill,
+                            lastDieselVariationAmount = record.lastDieselVariationAmount,
+                            lastDieselVariationTime = record.lastDieselVariationTime,
+                            lastDieselDipAmount = record.lastDieselDipAmount,
+                            lastDieselDipTime = record.lastDieselDipTime,
                             petrolPrice = record.petrolPrice,
                             dieselPrice = record.dieselPrice,
                             shift1 = nextDayShift1
