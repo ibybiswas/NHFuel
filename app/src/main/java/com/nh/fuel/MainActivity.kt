@@ -83,8 +83,7 @@ class MainActivity : ComponentActivity() {
                             .filter { it.date < currentDate }
                             .maxByOrNull { it.date }
 
-                        if (previousRecord != null) {
-                            // Function to find the latest non-zero close reading across Shift 3 -> Shift 2 -> Shift 1
+                        val newRec = if (previousRecord != null) {
                             fun getLatestClose(
                                 s3Close: Double,
                                 s2Close: Double,
@@ -190,6 +189,12 @@ class MainActivity : ComponentActivity() {
                         } else {
                             DailyFuelRecord(date = currentDate)
                         }
+
+                        // Auto-persist initial carry-forward record to DB immediately
+                        coroutineScope.launch {
+                            database.fuelDao().insertOrUpdate(newRec)
+                        }
+                        newRec
                     }
                 }
 
