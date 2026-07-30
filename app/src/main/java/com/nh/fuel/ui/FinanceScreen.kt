@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.nh.fuel.data.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -38,6 +40,7 @@ fun FinanceScreen(
     currentRecordDate: String,
     allExpenses: List<ExpenseItem> = emptyList(),
     allCredits: List<CreditRecord> = emptyList(),
+    allRecords: List<DailyFuelRecord> = emptyList(),
     onAddOrUpdateExpense: (ExpenseItem) -> Unit,
     onDeleteExpense: (ExpenseItem) -> Unit,
     onAddOrUpdateCredit: (CreditRecord) -> Unit,
@@ -93,6 +96,7 @@ fun FinanceScreen(
             1 -> CreditLedgerContent(
                 currentRecordDate = currentRecordDate,
                 allCredits = allCredits,
+                allRecords = allRecords,
                 onAddOrUpdateCredit = onAddOrUpdateCredit,
                 onDeleteCredit = onDeleteCredit,
                 bottomInset = bottomInset
@@ -115,40 +119,29 @@ fun ExpendScreenContent(
     var amountInput by remember { mutableStateOf("") }
     var expenseDateInput by remember(currentRecordDate) { mutableStateOf(currentRecordDate) }
     var showDatePickerModal by remember { mutableStateOf(false) }
-    var showTopDatePickerModal by remember { mutableStateOf(false) }
 
     var editingExpense by remember { mutableStateOf<ExpenseItem?>(null) }
     var selectedAggFilter by remember { mutableStateOf(ExpensePeriodFilter.ALL_TIME) }
     var customFromDate by remember { mutableStateOf(currentRecordDate) }
     var customToDate by remember { mutableStateOf(currentRecordDate) }
 
-    fun navigateDate(daysOffset: Int) {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val parsedDate = try { sdf.parse(currentRecordDate) ?: Date() } catch (e: Exception) { Date() }
-        val cal = Calendar.getInstance().apply {
-            time = parsedDate
-            add(Calendar.DAY_OF_MONTH, daysOffset)
-        }
-        onDateSelected(sdf.format(cal.time))
-    }
-
-    val dayExpenses = remember(allExpenses, currentRecordDate) {
-        allExpenses.filter { it.date == currentRecordDate }
+    val dayExpenses = remember(allExpenses, expenseDateInput) {
+        allExpenses.filter { it.date == expenseDateInput }
     }
     val totalDayExpense = remember(dayExpenses) {
         dayExpenses.sumOf { it.amount }
     }
 
-    val aggregatedExpenseTotal = remember(allExpenses, selectedAggFilter, currentRecordDate, customFromDate, customToDate) {
+    val aggregatedExpenseTotal = remember(allExpenses, selectedAggFilter, expenseDateInput, customFromDate, customToDate) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         when (selectedAggFilter) {
             ExpensePeriodFilter.ALL_TIME -> allExpenses.sumOf { it.amount }
             ExpensePeriodFilter.THIS_MONTH -> {
-                val currentMonth = currentRecordDate.take(7)
+                val currentMonth = expenseDateInput.take(7)
                 allExpenses.filter { it.date.startsWith(currentMonth) }.sumOf { it.amount }
             }
             ExpensePeriodFilter.THIS_YEAR -> {
-                val currentYear = currentRecordDate.take(4)
+                val currentYear = expenseDateInput.take(4)
                 allExpenses.filter { it.date.startsWith(currentYear) }.sumOf { it.amount }
             }
             ExpensePeriodFilter.CUSTOM -> {
@@ -169,54 +162,6 @@ fun ExpendScreenContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
     ) {
-        // Date Selector Row
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedButton(
-                    onClick = { navigateDate(-1) },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Prev Day", modifier = Modifier.size(16.dp))
-                    Text("Prev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = currentRecordDate,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    IconButton(
-                        onClick = { showTopDatePickerModal = true },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Select Date",
-                            tint = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = { navigateDate(1) },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Text("Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Day", modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
-        // Add New Expense Card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -256,7 +201,10 @@ fun ExpendScreenContent(
 
                         OutlinedTextField(
                             value = expenseDateInput,
-                            onValueChange = { expenseDateInput = it },
+                            onValueChange = { newDate ->
+                                expenseDateInput = newDate
+                                onDateSelected(newDate)
+                            },
                             label = { Text("Date", fontSize = 11.sp) },
                             singleLine = true,
                             trailingIcon = {
@@ -302,7 +250,6 @@ fun ExpendScreenContent(
             }
         }
 
-        // Aggregated Expenses Summary Card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -318,7 +265,7 @@ fun ExpendScreenContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Aggregated Expenses ($currentRecordDate):",
+                            text = "Aggregated Expenses ($expenseDateInput):",
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface
@@ -392,14 +339,13 @@ fun ExpendScreenContent(
 
         item {
             Text(
-                text = "Expense Log (${dayExpenses.size} items for $currentRecordDate):",
+                text = "Expense Log (${dayExpenses.size} items for $expenseDateInput):",
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
 
-        // Expense Item Card Blocks
         items(dayExpenses, key = { it.id }) { item ->
             ExpenseCardBlock(
                 item = item,
@@ -418,7 +364,9 @@ fun ExpendScreenContent(
                     showDatePickerModal = false
                     datePickerState.selectedDateMillis?.let { millis ->
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        expenseDateInput = sdf.format(Date(millis))
+                        val selectedStr = sdf.format(Date(millis))
+                        expenseDateInput = selectedStr
+                        onDateSelected(selectedStr)
                     }
                 }) { Text("Select Date", fontWeight = FontWeight.Bold) }
             },
@@ -427,27 +375,6 @@ fun ExpendScreenContent(
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showTopDatePickerModal) {
-        val topDatePickerState = rememberDatePickerState()
-        DatePickerDialog(
-            onDismissRequest = { showTopDatePickerModal = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    showTopDatePickerModal = false
-                    topDatePickerState.selectedDateMillis?.let { millis ->
-                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        onDateSelected(sdf.format(Date(millis)))
-                    }
-                }) { Text("Select Date", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTopDatePickerModal = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = topDatePickerState)
         }
     }
 
@@ -564,14 +491,27 @@ private fun EditExpenseDetailsDialog(
     var amountText by remember { mutableStateOf(expense.amount.toString()) }
     var dateText by remember { mutableStateOf(expense.date) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Expense Details", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
+                .navigationBarsPadding(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Text("Edit Expense Details", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
                 OutlinedTextField(
                     value = descText,
                     onValueChange = { descText = it },
@@ -594,26 +534,29 @@ private fun EditExpenseDetailsDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val newAmount = amountText.toDoubleOrNull() ?: expense.amount
-                if (descText.isNotBlank() && newAmount > 0.0) {
-                    onSave(
-                        expense.copy(
-                            description = descText.trim(),
-                            amount = newAmount,
-                            date = dateText.trim()
-                        )
-                    )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = {
+                        val newAmount = amountText.toDoubleOrNull() ?: expense.amount
+                        if (descText.isNotBlank() && newAmount > 0.0) {
+                            onSave(
+                                expense.copy(
+                                    description = descText.trim(),
+                                    amount = newAmount,
+                                    date = dateText.trim()
+                                )
+                            )
+                        }
+                    }) { Text("Save Changes", fontWeight = FontWeight.Bold) }
                 }
-            }) { Text("Save Changes", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -621,6 +564,7 @@ private fun EditExpenseDetailsDialog(
 private fun CreditLedgerContent(
     currentRecordDate: String,
     allCredits: List<CreditRecord>,
+    allRecords: List<DailyFuelRecord>,
     onAddOrUpdateCredit: (CreditRecord) -> Unit,
     onDeleteCredit: (CreditRecord) -> Unit,
     bottomInset: Dp
@@ -629,6 +573,7 @@ private fun CreditLedgerContent(
     var selectedFilter by remember { mutableStateOf(CreditStatus.UNPAID) }
     var showAddCreditDialog by remember { mutableStateOf(false) }
     var prefilledCustomerCredit by remember { mutableStateOf<CreditRecord?>(null) }
+    var isAddingNewDueToUser by remember { mutableStateOf(false) }
     var editingCredit by remember { mutableStateOf<CreditRecord?>(null) }
     var creditToSettle by remember { mutableStateOf<CreditRecord?>(null) }
 
@@ -712,6 +657,7 @@ private fun CreditLedgerContent(
             Button(
                 onClick = { 
                     prefilledCustomerCredit = null
+                    isAddingNewDueToUser = false
                     showAddCreditDialog = true 
                 },
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -733,8 +679,9 @@ private fun CreditLedgerContent(
             items(filteredCredits, key = { it.id }) { credit ->
                 CreditCardItem(
                     credit = credit,
-                    onAddMoreCredit = {
+                    onAddNewDue = {
                         prefilledCustomerCredit = credit
+                        isAddingNewDueToUser = true
                         showAddCreditDialog = true
                     },
                     onEdit = { editingCredit = credit },
@@ -749,6 +696,8 @@ private fun CreditLedgerContent(
         AddEditCreditDialog(
             currentRecordDate = currentRecordDate,
             initialCredit = prefilledCustomerCredit,
+            isAddingNewDue = isAddingNewDueToUser,
+            allRecords = allRecords,
             onDismiss = { showAddCreditDialog = false },
             onSave = { newCredit ->
                 onAddOrUpdateCredit(newCredit)
@@ -762,6 +711,7 @@ private fun CreditLedgerContent(
             currentRecordDate = currentRecordDate,
             initialCredit = credit,
             isEditing = true,
+            allRecords = allRecords,
             onDismiss = { editingCredit = null },
             onSave = { updatedCredit ->
                 onAddOrUpdateCredit(updatedCredit)
@@ -785,7 +735,7 @@ private fun CreditLedgerContent(
 @Composable
 private fun CreditCardItem(
     credit: CreditRecord,
-    onAddMoreCredit: () -> Unit,
+    onAddNewDue: () -> Unit,
     onEdit: () -> Unit,
     onSettle: () -> Unit,
     onDelete: () -> Unit
@@ -864,7 +814,6 @@ private fun CreditCardItem(
                 }
             }
 
-            // Expanded Customer Payment & Transaction Log
             AnimatedVisibility(visible = isExpanded) {
                 Column(
                     modifier = Modifier
@@ -875,7 +824,7 @@ private fun CreditCardItem(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
                     Text("Transaction & Settlement History Log:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
-                    Text("• Credit Issued: ₹ ${credit.totalAmountDue} on ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("• Credit Issued / Total Due: ₹ ${credit.totalAmountDue} on ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     
                     if (credit.lastPaymentDate.isNotBlank()) {
                         Text("• Last Settlement Received: ₹ ${credit.amountPaid} @ ${credit.lastPaymentDate}", fontSize = 10.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold)
@@ -884,7 +833,7 @@ private fun CreditCardItem(
                     }
 
                     if (credit.notes.isNotBlank()) {
-                        Text("• Notes: ${credit.notes}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("• History: ${credit.notes}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -905,13 +854,13 @@ private fun CreditCardItem(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(
-                        onClick = onAddMoreCredit,
+                        onClick = onAddNewDue,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         modifier = Modifier.height(28.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(2.dp))
-                        Text("+ Add Credit", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("+ Add New Due", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
 
                     if (credit.remainingBalance > 0.0) {
@@ -952,34 +901,56 @@ private fun AddEditCreditDialog(
     currentRecordDate: String,
     initialCredit: CreditRecord? = null,
     isEditing: Boolean = false,
+    isAddingNewDue: Boolean = false,
+    allRecords: List<DailyFuelRecord> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (CreditRecord) -> Unit
 ) {
-    var entryDate by remember { mutableStateOf(initialCredit?.date ?: currentRecordDate) }
+    var entryDate by remember { mutableStateOf(currentRecordDate) }
     var vehicleNo by remember { mutableStateOf(initialCredit?.vehicleNumber ?: "") }
     var customerName by remember { mutableStateOf(initialCredit?.customerName ?: "") }
     var mobileNo by remember { mutableStateOf(initialCredit?.mobileNumber ?: "") }
     var selectedFuelType by remember { mutableStateOf(initialCredit?.fuelType ?: CreditFuelType.PETROL) }
-    var petrolLitreText by remember { mutableStateOf(if ((initialCredit?.petrolQuantityLitre ?: 0.0) > 0) initialCredit?.petrolQuantityLitre.toString() else "") }
-    var dieselLitreText by remember { mutableStateOf(if ((initialCredit?.dieselQuantityLitre ?: 0.0) > 0) initialCredit?.dieselQuantityLitre.toString() else "") }
-    var totalAmountText by remember { mutableStateOf(if (isEditing) initialCredit?.totalAmountDue.toString() else "") }
-    var initialPaidText by remember { mutableStateOf(if (isEditing) initialCredit?.amountPaid.toString() else "") }
-    var showEntryDatePicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    var petrolLitreText by remember { mutableStateOf("") }
+    var dieselLitreText by remember { mutableStateOf("") }
+    var addedAmountText by remember { mutableStateOf("") }
+
+    var showEntryDatePicker by remember { mutableStateOf(false) }
+    var isCalculatingInternal by remember { mutableStateOf(false) }
+
+    // Fetch fuel rates for selected entry date from DailyFuelRecord
+    val currentDayRecord = remember(allRecords, entryDate) {
+        allRecords.find { it.date == entryDate } ?: DailyFuelRecord(date = entryDate)
+    }
+    val petrolRate = currentDayRecord.petrolPrice.let { if (it == 0.0) 100.0 else it }
+    val dieselRate = currentDayRecord.dieselPrice.let { if (it == 0.0) 90.0 else it }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { 
-            Text(
-                text = if (isEditing) "Edit Credit Entry" else if (initialCredit != null) "Add Credit for ${initialCredit.customerName}" else "New Credit / Lend Entry", 
-                fontWeight = FontWeight.Bold, 
-                fontSize = 15.sp
-            ) 
-        },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
+                .navigationBarsPadding(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text(
+                    text = if (isEditing) "Edit Credit Entry" else if (isAddingNewDue && initialCredit != null) "Add New Due for ${initialCredit.customerName}" else "New Credit / Lend Entry",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -991,102 +962,147 @@ private fun AddEditCreditDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = vehicleNo, 
-                    onValueChange = { vehicleNo = it }, 
-                    label = { Text("Vehicle No. (e.g. WB26A1234)", fontSize = 9.sp) }, 
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = customerName, 
-                    onValueChange = { customerName = it }, 
-                    label = { Text("Customer Name", fontSize = 9.sp) }, 
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = mobileNo, 
-                    onValueChange = { mobileNo = it }, 
-                    label = { Text("Mobile Number", fontSize = 9.sp) }, 
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), 
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Show customer details inputs only for full new credit entries or editing
+                if (!isAddingNewDue) {
+                    OutlinedTextField(
+                        value = vehicleNo,
+                        onValueChange = { vehicleNo = it },
+                        label = { Text("Vehicle No. (e.g. WB26A1234)", fontSize = 10.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        label = { Text("Customer Name", fontSize = 10.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = mobileNo,
+                        onValueChange = { mobileNo = it },
+                        label = { Text("Mobile Number", fontSize = 10.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(selected = selectedFuelType == CreditFuelType.PETROL, onClick = { selectedFuelType = CreditFuelType.PETROL }, label = { Text("Petrol", fontSize = 9.sp) })
-                    FilterChip(selected = selectedFuelType == CreditFuelType.DIESEL, onClick = { selectedFuelType = CreditFuelType.DIESEL }, label = { Text("Diesel", fontSize = 9.sp) })
+                    FilterChip(selected = selectedFuelType == CreditFuelType.PETROL, onClick = { selectedFuelType = CreditFuelType.PETROL }, label = { Text("Petrol (₹ $petrolRate/L)", fontSize = 9.sp) })
+                    FilterChip(selected = selectedFuelType == CreditFuelType.DIESEL, onClick = { selectedFuelType = CreditFuelType.DIESEL }, label = { Text("Diesel (₹ $dieselRate/L)", fontSize = 9.sp) })
                     FilterChip(selected = selectedFuelType == CreditFuelType.BOTH, onClick = { selectedFuelType = CreditFuelType.BOTH }, label = { Text("Both", fontSize = 9.sp) })
                 }
 
+                // Auto-calculation logic between Litres and Total Amount Due
                 if (selectedFuelType == CreditFuelType.PETROL || selectedFuelType == CreditFuelType.BOTH) {
                     OutlinedTextField(
-                        value = petrolLitreText, 
-                        onValueChange = { petrolLitreText = it }, 
-                        label = { Text("Petrol Litres (L)", fontSize = 9.sp) }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        value = petrolLitreText,
+                        onValueChange = { input ->
+                            petrolLitreText = input
+                            if (!isCalculatingInternal) {
+                                isCalculatingInternal = true
+                                val litres = input.toDoubleOrNull() ?: 0.0
+                                val calculated = litres * petrolRate
+                                addedAmountText = if (calculated > 0.0) String.format(Locale.US, "%.2f", calculated) else ""
+                                isCalculatingInternal = false
+                            }
+                        },
+                        label = { Text("Petrol Litres (L)", fontSize = 10.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+
                 if (selectedFuelType == CreditFuelType.DIESEL || selectedFuelType == CreditFuelType.BOTH) {
                     OutlinedTextField(
-                        value = dieselLitreText, 
-                        onValueChange = { dieselLitreText = it }, 
-                        label = { Text("Diesel Litres (L)", fontSize = 9.sp) }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        value = dieselLitreText,
+                        onValueChange = { input ->
+                            dieselLitreText = input
+                            if (!isCalculatingInternal) {
+                                isCalculatingInternal = true
+                                val litres = input.toDoubleOrNull() ?: 0.0
+                                val calculated = litres * dieselRate
+                                addedAmountText = if (calculated > 0.0) String.format(Locale.US, "%.2f", calculated) else ""
+                                isCalculatingInternal = false
+                            }
+                        },
+                        label = { Text("Diesel Litres (L)", fontSize = 10.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
                 OutlinedTextField(
-                    value = totalAmountText, 
-                    onValueChange = { totalAmountText = it }, 
-                    label = { Text("Total Amount Due (₹)", fontSize = 9.sp) }, 
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                    value = addedAmountText,
+                    onValueChange = { input ->
+                        addedAmountText = input
+                        if (!isCalculatingInternal) {
+                            isCalculatingInternal = true
+                            val amount = input.toDoubleOrNull() ?: 0.0
+                            when (selectedFuelType) {
+                                CreditFuelType.PETROL -> {
+                                    val litres = if (petrolRate > 0) amount / petrolRate else 0.0
+                                    petrolLitreText = if (litres > 0.0) String.format(Locale.US, "%.2f", litres) else ""
+                                }
+                                CreditFuelType.DIESEL -> {
+                                    val litres = if (dieselRate > 0) amount / dieselRate else 0.0
+                                    dieselLitreText = if (litres > 0.0) String.format(Locale.US, "%.2f", litres) else ""
+                                }
+                                else -> {}
+                            }
+                            isCalculatingInternal = false
+                        }
+                    },
+                    label = { Text(if (isAddingNewDue) "New Due Amount (₹)" else "Total Amount Due (₹)", fontSize = 10.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
-                if (!isEditing) {
-                    OutlinedTextField(
-                        value = initialPaidText, 
-                        onValueChange = { initialPaidText = it }, 
-                        label = { Text("Initial Down Payment (Optional ₹)", fontSize = 9.sp) }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = {
+                        val enteredDue = addedAmountText.toDoubleOrNull() ?: 0.0
+                        if (enteredDue > 0.0) {
+                            val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                            val record = if (isAddingNewDue && initialCredit != null) {
+                                val newNoteLog = buildString {
+                                    if (initialCredit.notes.isNotBlank()) append("${initialCredit.notes}\n")
+                                    append("• New Due Added: ₹ $enteredDue on $entryDate @ $nowStr")
+                                }
+                                initialCredit.copy(
+                                    date = entryDate,
+                                    petrolQuantityLitre = initialCredit.petrolQuantityLitre + (petrolLitreText.toDoubleOrNull() ?: 0.0),
+                                    dieselQuantityLitre = initialCredit.dieselQuantityLitre + (dieselLitreText.toDoubleOrNull() ?: 0.0),
+                                    totalAmountDue = initialCredit.totalAmountDue + enteredDue,
+                                    notes = newNoteLog
+                                )
+                            } else {
+                                (initialCredit ?: CreditRecord(date = entryDate)).copy(
+                                    date = entryDate,
+                                    vehicleNumber = vehicleNo.trim(),
+                                    customerName = customerName.trim(),
+                                    mobileNumber = mobileNo.trim(),
+                                    fuelType = selectedFuelType,
+                                    petrolQuantityLitre = petrolLitreText.toDoubleOrNull() ?: 0.0,
+                                    dieselQuantityLitre = dieselLitreText.toDoubleOrNull() ?: 0.0,
+                                    totalAmountDue = enteredDue
+                                )
+                            }
+                            onSave(record)
+                        }
+                    }) { Text("Save Entry", fontWeight = FontWeight.Bold) }
                 }
             }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val totalDue = totalAmountText.toDoubleOrNull() ?: 0.0
-                val initialPaid = initialPaidText.toDoubleOrNull() ?: 0.0
-                if (totalDue > 0.0) {
-                    val record = (initialCredit ?: CreditRecord(date = entryDate)).copy(
-                        date = entryDate,
-                        vehicleNumber = vehicleNo.trim(),
-                        customerName = customerName.trim(),
-                        mobileNumber = mobileNo.trim(),
-                        fuelType = selectedFuelType,
-                        petrolQuantityLitre = petrolLitreText.toDoubleOrNull() ?: 0.0,
-                        dieselQuantityLitre = dieselLitreText.toDoubleOrNull() ?: 0.0,
-                        totalAmountDue = totalDue,
-                        amountPaid = if (isEditing) initialCredit?.amountPaid ?: 0.0 else initialPaid,
-                        lastPaymentDate = if (initialPaid > 0.0 && !isEditing) SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date()) else initialCredit?.lastPaymentDate ?: ""
-                    )
-                    onSave(record)
-                }
-            }) { Text("Save Entry", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 
     if (showEntryDatePicker) {
         val datePickerState = rememberDatePickerState()
@@ -1118,42 +1134,63 @@ private fun SettleCreditDialog(
 ) {
     var paymentAmountText by remember { mutableStateOf("") }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Payment Settlement", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
+                .navigationBarsPadding(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("Record Payment Settlement", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
                 Text("Customer: ${credit.customerName}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("Remaining Balance: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.remainingBalance)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
 
                 OutlinedTextField(
                     value = paymentAmountText,
                     onValueChange = { paymentAmountText = it },
-                    label = { Text("Amount Received (₹)", fontSize = 9.sp) },
+                    label = { Text("Amount Received (₹)", fontSize = 10.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val addedPayment = paymentAmountText.toDoubleOrNull() ?: 0.0
-                if (addedPayment > 0.0) {
-                    val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                    val updated = credit.copy(
-                        amountPaid = credit.amountPaid + addedPayment,
-                        lastPaymentDate = nowStr
-                    )
-                    onConfirmSettlement(updated)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = {
+                        val addedPayment = paymentAmountText.toDoubleOrNull() ?: 0.0
+                        if (addedPayment > 0.0) {
+                            val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                            val newNoteLog = buildString {
+                                if (credit.notes.isNotBlank()) append("${credit.notes}\n")
+                                append("• Settlement Received: ₹ $addedPayment @ $nowStr")
+                            }
+                            val updated = credit.copy(
+                                amountPaid = credit.amountPaid + addedPayment,
+                                lastPaymentDate = nowStr,
+                                notes = newNoteLog
+                            )
+                            onConfirmSettlement(updated)
+                        }
+                    }) { Text("Confirm Payment", fontWeight = FontWeight.Bold) }
                 }
-            }) { Text("Confirm Payment", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
-    )
+    }
 }
