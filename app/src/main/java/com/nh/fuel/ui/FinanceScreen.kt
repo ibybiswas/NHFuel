@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nh.fuel.data.*
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -34,10 +35,22 @@ fun FinanceScreen(
     onDeleteExpense: (ExpenseItem) -> Unit,
     onAddOrUpdateCredit: (CreditRecord) -> Unit,
     onDeleteCredit: (CreditRecord) -> Unit,
+    onDateSelected: (String) -> Unit = {},
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp
 ) {
     var selectedSubTab by remember { mutableStateOf(0) } // 0: Expenses, 1: Credit / Lend
+    var showDatePickerModal by remember { mutableStateOf(false) }
+
+    fun navigateDate(daysOffset: Int) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val parsedDate = try { sdf.parse(currentRecordDate) ?: Date() } catch (e: Exception) { Date() }
+        val cal = Calendar.getInstance().apply {
+            time = parsedDate
+            add(Calendar.DAY_OF_MONTH, daysOffset)
+        }
+        onDateSelected(sdf.format(cal.time))
+    }
 
     Column(
         modifier = Modifier
@@ -52,6 +65,53 @@ fun FinanceScreen(
             fontSize = 18.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
+
+        Spacer(Modifier.height(8.dp))
+
+        // Date Picker Bar for Finance Tab
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedButton(
+                onClick = { navigateDate(-1) },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Icon(Icons.Default.ChevronLeft, contentDescription = "Prev Day", modifier = Modifier.size(16.dp))
+                Text("Prev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = currentRecordDate,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(
+                    onClick = { showDatePickerModal = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Select Date",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = { navigateDate(1) },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text("Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.ChevronRight, contentDescription = "Next Day", modifier = Modifier.size(16.dp))
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -87,6 +147,27 @@ fun FinanceScreen(
                 onDeleteCredit = onDeleteCredit,
                 bottomInset = bottomInset
             )
+        }
+    }
+
+    if (showDatePickerModal) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePickerModal = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDatePickerModal = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        onDateSelected(sdf.format(Date(millis)))
+                    }
+                }) { Text("Select Date", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePickerModal = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
@@ -459,12 +540,14 @@ private fun CreditCardItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddEditCreditDialog(
     currentRecordDate: String,
     onDismiss: () -> Unit,
     onSave: (CreditRecord) -> Unit
 ) {
+    var entryDate by remember { mutableStateOf(currentRecordDate) }
     var vehicleNo by remember { mutableStateOf("") }
     var customerName by remember { mutableStateOf("") }
     var mobileNo by remember { mutableStateOf("") }
@@ -473,12 +556,24 @@ private fun AddEditCreditDialog(
     var dieselLitreText by remember { mutableStateOf("") }
     var totalAmountText by remember { mutableStateOf("") }
     var initialPaidText by remember { mutableStateOf("") }
+    var showEntryDatePicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New Credit / Lend Entry", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Date: $entryDate", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    TextButton(onClick = { showEntryDatePicker = true }) {
+                        Text("Change Date", fontSize = 11.sp)
+                    }
+                }
+
                 OutlinedTextField(value = vehicleNo, onValueChange = { vehicleNo = it }, label = { Text("Vehicle No. (e.g. WB26A1234)", fontSize = 9.sp) }, singleLine = true)
                 OutlinedTextField(value = customerName, onValueChange = { customerName = it }, label = { Text("Customer Name", fontSize = 9.sp) }, singleLine = true)
                 OutlinedTextField(value = mobileNo, onValueChange = { mobileNo = it }, label = { Text("Mobile Number", fontSize = 9.sp) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true)
@@ -506,7 +601,7 @@ private fun AddEditCreditDialog(
                 val initialPaid = initialPaidText.toDoubleOrNull() ?: 0.0
                 if (totalDue > 0.0) {
                     val record = CreditRecord(
-                        date = currentRecordDate,
+                        date = entryDate,
                         vehicleNumber = vehicleNo.trim(),
                         customerName = customerName.trim(),
                         mobileNumber = mobileNo.trim(),
@@ -525,6 +620,27 @@ private fun AddEditCreditDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+
+    if (showEntryDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showEntryDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    showEntryDatePicker = false
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        entryDate = sdf.format(Date(millis))
+                    }
+                }) { Text("Select Date", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEntryDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @Composable
