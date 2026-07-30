@@ -105,7 +105,21 @@ class MainActivity : ComponentActivity() {
                             DailyFuelRecord(
                                 date = currentDate,
                                 petrolTotal = previousRecord.currentPetrolStorage,
+                                petrolRefill = previousRecord.petrolRefill,
+                                petrolVariation = previousRecord.petrolVariation,
+                                lastPetrolRefill = previousRecord.lastPetrolRefill,
+                                lastPetrolVariationAmount = previousRecord.lastPetrolVariationAmount,
+                                lastPetrolVariationTime = previousRecord.lastPetrolVariationTime,
+                                lastPetrolDipAmount = previousRecord.lastPetrolDipAmount,
+                                lastPetrolDipTime = previousRecord.lastPetrolDipTime,
                                 dieselTotal = previousRecord.currentDieselStorage,
+                                dieselRefill = previousRecord.dieselRefill,
+                                dieselVariation = previousRecord.dieselVariation,
+                                lastDieselRefill = previousRecord.lastDieselRefill,
+                                lastDieselVariationAmount = previousRecord.lastDieselVariationAmount,
+                                lastDieselVariationTime = previousRecord.lastDieselVariationTime,
+                                lastDieselDipAmount = previousRecord.lastDieselDipAmount,
+                                lastDieselDipTime = previousRecord.lastDieselDipTime,
                                 petrolPrice = previousRecord.petrolPrice,
                                 dieselPrice = previousRecord.dieselPrice,
                                 shift1 = carriedShift1
@@ -119,6 +133,9 @@ class MainActivity : ComponentActivity() {
                 val expensesFlow = database.expenseDao().getAllExpenses().collectAsState(initial = emptyList())
                 val allExpenses = expensesFlow.value
 
+                val creditsFlow = database.creditDao().getAllCredits().collectAsState(initial = emptyList())
+                val allCredits = creditsFlow.value
+
                 val navBarOpacity by appPreferences.opacityFlow.collectAsState(
                     initial = AppPreferences.DEFAULT_GLASS_OPACITY
                 )
@@ -127,6 +144,7 @@ class MainActivity : ComponentActivity() {
                     record = currentRecord,
                     allRecords = allRecords,
                     allExpenses = allExpenses,
+                    allCredits = allCredits,
                     navBarOpacity = navBarOpacity,
                     themeMode = themeMode,
                     onRecordChanged = { updatedRecord ->
@@ -155,6 +173,16 @@ class MainActivity : ComponentActivity() {
                     onDeleteExpense = { expenseItem ->
                         coroutineScope.launch {
                             database.expenseDao().deleteExpense(expenseItem)
+                        }
+                    },
+                    onAddOrUpdateCredit = { creditRecord ->
+                        coroutineScope.launch {
+                            database.creditDao().insertOrUpdate(creditRecord)
+                        }
+                    },
+                    onDeleteCredit = { creditRecord ->
+                        coroutineScope.launch {
+                            database.creditDao().deleteCredit(creditRecord)
                         }
                     }
                 )
