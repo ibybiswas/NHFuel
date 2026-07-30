@@ -95,16 +95,18 @@ fun MainContainerScreen(
                 )
                 2 -> PlaceholderTab("Reports & Analytics")
                 3 -> FinanceScreen(
-                    currentRecordDate = record.date,
-                    allExpenses = allExpenses,
-                    allCredits = allCredits,
-                    onAddOrUpdateExpense = onAddOrUpdateExpense,
-                    onDeleteExpense = onDeleteExpense,
-                    onAddOrUpdateCredit = onAddOrUpdateCredit,
-                    onDeleteCredit = onDeleteCredit,
-                    topInset = topInset,
-                    bottomInset = bottomInset
-                )
+    currentRecordDate = record.date,
+    allExpenses = allExpenses,
+    allCredits = allCredits,
+    allRecords = allRecords,
+    onAddOrUpdateExpense = onAddOrUpdateExpense,
+    onDeleteExpense = onDeleteExpense,
+    onAddOrUpdateCredit = onAddOrUpdateCredit,
+    onDeleteCredit = onDeleteCredit,
+    onDateSelected = onDateSelected,
+    topInset = topInset,
+    bottomInset = bottomInset
+)
                 4 -> SettingsScreen(
                     currentOpacity = navBarOpacity,
                     currentThemeMode = themeMode,
