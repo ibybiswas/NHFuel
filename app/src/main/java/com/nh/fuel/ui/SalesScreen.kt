@@ -84,15 +84,15 @@ fun SalesScreen(
                 records.filter { rec ->
                     val recDate = try { sdf.parse(rec.date) } catch (e: Exception) { null }
                     recDate != null && !recDate.before(startDate) && !recDate.after(targetDate)
-                }
+                }.sortedBy { it.date }
             }
             PeriodFilter.MONTH -> {
                 val currentMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(targetDate)
-                records.filter { it.date.startsWith(currentMonth) }
+                records.filter { it.date.startsWith(currentMonth) }.sortedBy { it.date }
             }
             PeriodFilter.YEAR -> {
                 val currentYear = SimpleDateFormat("yyyy", Locale.getDefault()).format(targetDate)
-                records.filter { it.date.startsWith(currentYear) }
+                records.filter { it.date.startsWith(currentYear) }.sortedBy { it.date }
             }
             PeriodFilter.CUSTOM -> {
                 val fromD = try { sdf.parse(fromDateInput) } catch (e: Exception) { null }
@@ -101,7 +101,7 @@ fun SalesScreen(
                     records.filter { rec ->
                         val d = try { sdf.parse(rec.date) } catch (e: Exception) { null }
                         d != null && !d.before(fromD) && !d.after(toD)
-                    }
+                    }.sortedBy { it.date }
                 } else records.filter { it.date == currentRecord.date }
             }
         }
@@ -408,7 +408,6 @@ fun SalesScreen(
         Spacer(Modifier.height(bottomInset + 4.dp))
     }
 
-    // Material 3 Date Picker Dialog
     if (showDatePickerModal) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -430,7 +429,6 @@ fun SalesScreen(
         }
     }
 
-    // 3-Option Export Selection Dialog (.XLS, .CSV, .HTML)
     if (showExportFormatDialog) {
         AlertDialog(
             onDismissRequest = { showExportFormatDialog = false },
@@ -679,7 +677,6 @@ private fun formatSignedCurrency(amount: Double): String {
     return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
 }
 
-/** Unified Export Manager for XLS, CSV, and HTML */
 private fun exportSalesRecord(
     context: Context,
     records: List<DailyFuelRecord>,
@@ -687,6 +684,17 @@ private fun exportSalesRecord(
     format: ExportFormat
 ) {
     val fileTimestamp = System.currentTimeMillis()
+    val isMultiDay = records.size > 1
+
+    val sumPetrolLitre = records.sumOf { it.totalPetrolSell }
+    val sumPetrolRev = records.sumOf { it.totalPetrolRevenue }
+    val sumDieselLitre = records.sumOf { it.totalDieselSell }
+    val sumDieselRev = records.sumOf { it.totalDieselRevenue }
+    val sumGrandRev = records.sumOf { it.grandTotalRevenue }
+    val sumCash = records.sumOf { it.dailyCashCollected }
+    val sumDigital = records.sumOf { it.dailyDigitalCollected }
+    val sumTotalCollected = records.sumOf { it.dailyTotalCollected }
+    val sumMismatch = records.sumOf { it.dailyMismatch }
 
     when (format) {
         ExportFormat.CSV -> {
@@ -698,6 +706,11 @@ private fun exportSalesRecord(
                 records.forEach { record ->
                     val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
                     append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch\n")
+                }
+
+                if (isMultiDay) {
+                    val rawSumMismatch = String.format(Locale.US, "%.2f", sumMismatch)
+                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},$sumDieselLitre,-,${formatCurrency(sumDieselRev)},${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch\n")
                 }
             }
 
@@ -722,6 +735,7 @@ private fun exportSalesRecord(
                 append(".report-title { background-color: #1A237E; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; }")
                 append(".period-title { background-color: #E8EAF6; color: #1A237E; font-size: 12px; font-weight: bold; text-align: center; }")
                 append(".header-row th { background-color: #1565C0; color: #FFFFFF; font-weight: bold; text-align: center; }")
+                append(".grand-total-row td { background-color: #FFF9C4; color: #000000; font-weight: bold; }")
                 append(".number-cell { text-align: right; }")
                 append("</style></head><body>")
 
@@ -760,6 +774,24 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
                     append("<td class=\"number-cell\">$rawMismatch</td>")
+                    append("</tr>")
+                }
+
+                if (isMultiDay) {
+                    val rawSumMismatch = String.format(Locale.US, "%.2f", sumMismatch)
+                    append("<tr class=\"grand-total-row\">")
+                    append("<td>GRAND TOTAL</td>")
+                    append("<td class=\"number-cell\">$sumPetrolLitre</td>")
+                    append("<td class=\"number-cell\">-</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumPetrolRev)}</td>")
+                    append("<td class=\"number-cell\">$sumDieselLitre</td>")
+                    append("<td class=\"number-cell\">-</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumDieselRev)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumGrandRev)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumCash)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumDigital)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumTotalCollected)}</td>")
+                    append("<td class=\"number-cell\">$rawSumMismatch</td>")
                     append("</tr>")
                 }
 
