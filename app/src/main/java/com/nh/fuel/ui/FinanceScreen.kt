@@ -401,70 +401,11 @@ fun ExpendScreenContent(
 
         // Expense Item Card Blocks
         items(dayExpenses, key = { it.id }) { item ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = item.description,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = if (item.timestamp.isNotBlank()) "Logged on ${item.date} @ ${item.timestamp}" else "Logged on ${item.date}",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.error
-                        )
-
-                        IconButton(
-                            onClick = { editingExpense = item },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit Expense",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { onDeleteExpense(item) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete Expense",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            ExpenseCardBlock(
+                item = item,
+                onEdit = { editingExpense = item },
+                onDelete = { onDeleteExpense(item) }
+            )
         }
     }
 
@@ -517,6 +458,97 @@ fun ExpendScreenContent(
             onSave = { updatedExpense ->
                 onAddOrUpdateExpense(updatedExpense)
                 editingExpense = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun ExpenseCardBlock(
+    item: ExpenseItem,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = item.description,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (item.timestamp.isNotBlank()) "Logged on ${item.date} @ ${item.timestamp}" else "Logged on ${item.date}",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Expense",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete Expense",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Expense Item?", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to remove '${item.description}' (₹ ${item.amount})?", fontSize = 12.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete()
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
             }
         )
     }
@@ -832,7 +864,7 @@ private fun CreditCardItem(
                 }
             }
 
-            // Expanded Customer Payment & History Log
+            // Expanded Customer Payment & Transaction Log
             AnimatedVisibility(visible = isExpanded) {
                 Column(
                     modifier = Modifier
@@ -842,7 +874,7 @@ private fun CreditCardItem(
                 ) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
-                    Text("Transaction & Payment History Log:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("Transaction & Settlement History Log:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                     Text("• Credit Issued: ₹ ${credit.totalAmountDue} on ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     
                     if (credit.lastPaymentDate.isNotBlank()) {
@@ -872,7 +904,6 @@ private fun CreditCardItem(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Button to add quick credit for registered user
                     OutlinedButton(
                         onClick = onAddMoreCredit,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -1036,7 +1067,7 @@ private fun AddEditCreditDialog(
                 val totalDue = totalAmountText.toDoubleOrNull() ?: 0.0
                 val initialPaid = initialPaidText.toDoubleOrNull() ?: 0.0
                 if (totalDue > 0.0) {
-                    val record = (initialCredit ?: CreditRecord()).copy(
+                    val record = (initialCredit ?: CreditRecord(date = entryDate)).copy(
                         date = entryDate,
                         vehicleNumber = vehicleNo.trim(),
                         customerName = customerName.trim(),
