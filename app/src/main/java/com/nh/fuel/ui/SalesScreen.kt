@@ -390,7 +390,7 @@ fun SalesScreen(
                     PeriodFilter.YEAR -> "Year: ${currentRecord.date.take(4)}"
                     PeriodFilter.CUSTOM -> "Custom Period: $fromDateInput to $toDateInput"
                 }
-                exportSalesToCSV(context, filteredRecords, periodDesc)
+                exportSalesToExcel(context, filteredRecords, periodDesc)
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -399,13 +399,12 @@ fun SalesScreen(
         ) {
             Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Export Sales Report (.CSV / Excel)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("Export Sales Report (.XLS / Excel)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
         Spacer(Modifier.height(bottomInset + 4.dp))
     }
 
-    // Material 3 Date Picker Dialog
     if (showDatePickerModal) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -617,33 +616,74 @@ private fun formatSignedCurrency(amount: Double): String {
     return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
 }
 
-private fun exportSalesToCSV(context: Context, records: List<DailyFuelRecord>, periodDescription: String) {
-    val utf8Bom = "\uFEFF"
-    val reportHeader = "NH Fuel Station Sales Report\n" +
-            "Report Period: $periodDescription\n\n"
-    val csvHeader = "Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n"
-    val csvBody = StringBuilder()
+private fun exportSalesToExcel(context: Context, records: List<DailyFuelRecord>, periodDescription: String) {
+    val totalColumns = 12
 
-    records.forEach { record ->
-        val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
-        csvBody.append(
-            "${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},${rawMismatch}\n"
-        )
+    val htmlBuilder = StringBuilder().apply {
+        append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>")
+        append("table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }")
+        append("th, td { border: 1px solid #444444; padding: 6px 10px; text-align: left; }")
+        append(".report-title { background-color: #1A237E; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; }")
+        append(".period-title { background-color: #E8EAF6; color: #1A237E; font-size: 12px; font-weight: bold; text-align: center; }")
+        append(".header-row th { background-color: #1565C0; color: #FFFFFF; font-weight: bold; text-align: center; }")
+        append(".number-cell { text-align: right; }")
+        append("</style></head><body>")
+        
+        append("<table>")
+        
+        append("<tr><td colspan=\"$totalColumns\" class=\"report-title\">NH Fuel Station Sales Report</td></tr>")
+        append("<tr><td colspan=\"$totalColumns\" class=\"period-title\">Report Period: $periodDescription</td></tr>")
+        append("<tr><td colspan=\"$totalColumns\" style=\"border: none;\"></td></tr>")
+
+        append("<tr class=\"header-row\">")
+        append("<th>Date</th>")
+        append("<th>Petrol Sold (L)</th>")
+        append("<th>Petrol Rate (Rs)</th>")
+        append("<th>Petrol Revenue (Rs)</th>")
+        append("<th>Diesel Sold (L)</th>")
+        append("<th>Diesel Rate (Rs)</th>")
+        append("<th>Diesel Revenue (Rs)</th>")
+        append("<th>Grand Total Revenue (Rs)</th>")
+        append("<th>Cash Collected (Rs)</th>")
+        append("<th>Digital Collected (Rs)</th>")
+        append("<th>Total Payment Collected (Rs)</th>")
+        append("<th>Total Mismatch (Rs)</th>")
+        append("</tr>")
+
+        records.forEach { record ->
+            val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
+            append("<tr>")
+            append("<td>${record.date}</td>")
+            append("<td class=\"number-cell\">${record.totalPetrolSell}</td>")
+            append("<td class=\"number-cell\">${record.petrolPrice}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.totalPetrolRevenue)}</td>")
+            append("<td class=\"number-cell\">${record.totalDieselSell}</td>")
+            append("<td class=\"number-cell\">${record.dieselPrice}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.totalDieselRevenue)}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
+            append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
+            append("<td class=\"number-cell\">$rawMismatch</td>")
+            append("</tr>")
+        }
+
+        append("</table></body></html>")
     }
 
     try {
-        val fileName = "NHFuel_Sales_Report_${System.currentTimeMillis()}.csv"
+        val fileName = "NHFuel_Sales_Report_${System.currentTimeMillis()}.xls"
         val file = File(context.cacheDir, fileName)
-        file.writeText(utf8Bom + reportHeader + csvHeader + csvBody.toString(), Charsets.UTF_8)
+        file.writeText(htmlBuilder.toString(), Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/csv"
+            type = "application/vnd.ms-excel"
             putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Sales Report")
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Sales Report CSV"))
+        context.startActivity(Intent.createChooser(shareIntent, "Share Sales Report"))
     } catch (e: Exception) {
         e.printStackTrace()
     }
