@@ -9,12 +9,22 @@ data class RefillEvent(
     val timestamp: String = ""
 )
 
+data class TestingEvent(
+    val petrolTestingAmount: Double = 0.0,
+    val dieselTestingAmount: Double = 0.0,
+    val timestamp: String = ""
+)
+
 data class NozzleShift(
     val open: Double = 0.0,
-    val close: Double = 0.0
+    val close: Double = 0.0,
+    val testing: Double = 0.0
 ) {
     val isValid: Boolean get() = close >= open || close == 0.0
-    val sale: Double get() = if (close >= open && close > 0.0) close - open else 0.0
+    // Gross meter difference
+    val grossSale: Double get() = if (close >= open && close > 0.0) close - open else 0.0
+    // Net sale after deducting fuel returned to tank during testing
+    val sale: Double get() = max(0.0, grossSale - testing)
     val isClosed: Boolean get() = close > 0.0 && close >= open
 }
 
@@ -24,9 +34,10 @@ data class DispenserShift(
     val dieselN1: NozzleShift = NozzleShift(),
     val dieselN4: NozzleShift = NozzleShift(),
 
-    // Payment collection tracking per MPD dispenser
     val cashCollected: Double = 0.0,
-    val digitalCollected: Double = 0.0
+    val digitalCollected: Double = 0.0,
+
+    val lastTestingEvent: TestingEvent = TestingEvent()
 ) {
     val petrolSale: Double get() = petrolN2.sale + petrolN3.sale
     val dieselSale: Double get() = dieselN1.sale + dieselN4.sale
@@ -51,6 +62,9 @@ data class DayShift(
 ) {
     val petrolSale: Double get() = mpd1.petrolSale + mpd2.petrolSale
     val dieselSale: Double get() = mpd1.dieselSale + mpd2.dieselSale
+    val totalPetrolTesting: Double get() = mpd1.petrolN2.testing + mpd1.petrolN3.testing + mpd2.petrolN2.testing + mpd2.petrolN3.testing
+    val totalDieselTesting: Double get() = mpd1.dieselN1.testing + mpd1.dieselN4.testing + mpd2.dieselN1.testing + mpd2.dieselN4.testing
+
     val isComplete: Boolean get() = mpd1.isShiftComplete && mpd2.isShiftComplete
 
     val totalCashCollected: Double get() = mpd1.cashCollected + mpd2.cashCollected
@@ -98,6 +112,10 @@ data class DailyFuelRecord(
     val totalPetrolSell: Double get() = shift1.petrolSale + shift2.petrolSale + shift3.petrolSale
     val totalDieselSell: Double get() = shift1.dieselSale + shift2.dieselSale + shift3.dieselSale
 
+    val totalPetrolTesting: Double get() = shift1.totalPetrolTesting + shift2.totalPetrolTesting + shift3.totalPetrolTesting
+    val totalDieselTesting: Double get() = shift1.totalDieselTesting + shift2.totalDieselTesting + shift3.totalDieselTesting
+
+    // Tank stock deductions apply to Net Sales only (Testing fuel returned to tank is NOT deducted)
     val currentPetrolStorage: Double 
         get() = max(0.0, (petrolTotal + petrolRefill) + petrolVariation - totalPetrolSell)
     val currentDieselStorage: Double 
@@ -110,7 +128,6 @@ data class DailyFuelRecord(
     val totalDieselRevenue: Double get() = getDieselAmount(totalDieselSell)
     val grandTotalRevenue: Double get() = totalPetrolRevenue + totalDieselRevenue
 
-    // Aggregated Daily Collections & Mismatch
     val dailyCashCollected: Double get() = shift1.totalCashCollected + shift2.totalCashCollected + shift3.totalCashCollected
     val dailyDigitalCollected: Double get() = shift1.totalDigitalCollected + shift2.totalDigitalCollected + shift3.totalDigitalCollected
     val dailyTotalCollected: Double get() = dailyCashCollected + dailyDigitalCollected
