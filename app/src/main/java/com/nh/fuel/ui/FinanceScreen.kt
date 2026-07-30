@@ -101,7 +101,6 @@ fun ExpendScreenContent(
 ) {
     var titleInput by remember { mutableStateOf("") }
     var amountInput by remember { mutableStateOf("") }
-    var categoryInput by remember { mutableStateOf("General") }
 
     val dayExpenses = remember(allExpenses, currentRecordDate) {
         allExpenses.filter { it.date == currentRecordDate }
@@ -154,9 +153,8 @@ fun ExpendScreenContent(
                             onAddOrUpdateExpense(
                                 ExpenseItem(
                                     date = currentRecordDate,
-                                    title = titleInput.trim(),
-                                    amount = amount,
-                                    category = categoryInput
+                                    description = titleInput.trim(),
+                                    amount = amount
                                 )
                             )
                             titleInput = ""
@@ -187,8 +185,7 @@ fun ExpendScreenContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(item.title, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("Category: ${item.category}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(item.description, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
