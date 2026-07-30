@@ -9,16 +9,16 @@ enum class CreditStatus { UNPAID, PARTIAL, PAID }
 @Entity(tableName = "credit_records")
 data class CreditRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val date: String,                   // YYYY-MM-DD
-    val vehicleNumber: String = "",     // Vehicle Number
-    val customerName: String = "",      // Customer Name
-    val mobileNumber: String = "",      // Mobile Number
+    val date: String,
+    val vehicleNumber: String = "",
+    val customerName: String = "",
+    val mobileNumber: String = "",
     val fuelType: CreditFuelType = CreditFuelType.PETROL,
     val petrolQuantityLitre: Double = 0.0,
     val dieselQuantityLitre: Double = 0.0,
-    val totalAmountDue: Double = 0.0,   // Total credit amount
-    val amountPaid: Double = 0.0,       // Total paid so far
-    val lastPaymentDate: String = "",   // Timestamp of last settlement
+    val totalAmountDue: Double = 0.0,
+    val amountPaid: Double = 0.0,
+    val lastPaymentDate: String = "",
     val notes: String = ""
 ) {
     val remainingBalance: Double get() = (totalAmountDue - amountPaid).coerceAtLeast(0.0)
