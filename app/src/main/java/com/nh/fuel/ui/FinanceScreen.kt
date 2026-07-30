@@ -225,14 +225,13 @@ fun ExpendScreenContent(
                             val amount = amountInput.toDoubleOrNull() ?: 0.0
                             if (descriptionInput.isNotBlank() && amount > 0.0) {
                                 val targetDate = expenseDateInput.ifBlank { currentRecordDate }
-                                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                                val timeLog = if (targetDate == todayStr) SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()) else ""
+                                val nowTimeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
                                 onAddOrUpdateExpense(
                                     ExpenseItem(
                                         date = targetDate,
                                         description = descriptionInput.trim(),
                                         amount = amount,
-                                        timestamp = timeLog
+                                        timestamp = nowTimeStr
                                     )
                                 )
                                 descriptionInput = ""
@@ -1001,12 +1000,20 @@ private fun AddEditCreditDialog(
     var showEntryDatePicker by remember { mutableStateOf(false) }
     var isCalculatingInternal by remember { mutableStateOf(false) }
 
-    // Dynamic rate fetching corresponding to selected entry date
-    val currentDayRecord = remember(entryDate, allRecords) {
-        allRecords.find { it.date == entryDate } ?: DailyFuelRecord(date = entryDate)
+    // Dynamic fuel rates lookup from allRecords for entryDate (fallback to latest recorded non-zero prices)
+    val fuelRates = remember(entryDate, allRecords) {
+        val exactRecord = allRecords.find { it.date == entryDate }
+        val pPrice = exactRecord?.petrolPrice ?: 0.0
+        val dPrice = exactRecord?.dieselPrice ?: 0.0
+
+        val fallbackP = if (pPrice > 0.0) pPrice else allRecords.filter { it.petrolPrice > 0.0 }.maxByOrNull { it.date }?.petrolPrice ?: 100.0
+        val fallbackD = if (dPrice > 0.0) dPrice else allRecords.filter { it.dieselPrice > 0.0 }.maxByOrNull { it.date }?.dieselPrice ?: 90.0
+
+        Pair(fallbackP, fallbackD)
     }
-    val petrolRate = currentDayRecord.petrolPrice.let { if (it == 0.0) 100.0 else it }
-    val dieselRate = currentDayRecord.dieselPrice.let { if (it == 0.0) 90.0 else it }
+
+    val petrolRate = fuelRates.first
+    val dieselRate = fuelRates.second
 
     Dialog(
         onDismissRequest = onDismiss,
