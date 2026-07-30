@@ -84,6 +84,7 @@ fun MainContainerScreen(
                 1 -> SalesScreen(
                     currentRecord = record,
                     allRecords = allRecords,
+                    allExpenses = allExpenses,
                     onRecordChanged = onRecordChanged,
                     onDateSelected = onDateSelected,
                     topInset = topInset,
@@ -599,7 +600,6 @@ fun HomeScreenContent(
             )
         }
 
-        // PUMP TESTING ENABLE / DISABLE ROW (Placed above Shift Tabs as requested)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -1523,6 +1523,17 @@ fun NozzleRow(
             Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
             NumberField("Open", nozzle.open, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
             NumberField("Close", nozzle.close, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
+        }
+
+        // Display Testing indicator badge below nozzle row if testing > 0
+        if (nozzle.testing > 0.0 && !showTestingField) {
+            Text(
+                text = "P.T - ${nozzle.testing}L",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 24.dp, top = 1.dp)
+            )
         }
 
         if (showTestingField) {
