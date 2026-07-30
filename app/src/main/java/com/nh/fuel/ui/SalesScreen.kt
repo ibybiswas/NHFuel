@@ -688,8 +688,12 @@ private fun exportSalesRecord(
 
     val sumPetrolLitre = records.sumOf { it.totalPetrolSell }
     val sumPetrolRev = records.sumOf { it.totalPetrolRevenue }
+    val sumPetrolVar = records.sumOf { it.petrolVariation }
+
     val sumDieselLitre = records.sumOf { it.totalDieselSell }
     val sumDieselRev = records.sumOf { it.totalDieselRevenue }
+    val sumDieselVar = records.sumOf { it.dieselVariation }
+
     val sumGrandRev = records.sumOf { it.grandTotalRevenue }
     val sumCash = records.sumOf { it.dailyCashCollected }
     val sumDigital = records.sumOf { it.dailyDigitalCollected }
@@ -701,16 +705,16 @@ private fun exportSalesRecord(
             val csvBuilder = StringBuilder().apply {
                 append("NH Fuel Station Sales Report\n")
                 append("Report Period: $periodDescription\n\n")
-                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n")
+                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Petrol Var (L),Petrol Stock (L),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Diesel Var (L),Diesel Stock (L),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n")
 
                 records.forEach { record ->
                     val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
-                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch\n")
+                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.petrolVariation},${record.currentPetrolStorage},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${record.dieselVariation},${record.currentDieselStorage},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch\n")
                 }
 
                 if (isMultiDay) {
                     val rawSumMismatch = String.format(Locale.US, "%.2f", sumMismatch)
-                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},$sumDieselLitre,-,${formatCurrency(sumDieselRev)},${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch\n")
+                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},$sumPetrolVar,-,$sumDieselLitre,-,${formatCurrency(sumDieselRev)},$sumDieselVar,-,${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch\n")
                 }
             }
 
@@ -723,7 +727,7 @@ private fun exportSalesRecord(
         }
 
         ExportFormat.XLS, ExportFormat.HTML -> {
-            val totalColumns = 12
+            val totalColumns = 16
             val ext = if (format == ExportFormat.XLS) "xls" else "html"
             val mime = if (format == ExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
@@ -749,9 +753,13 @@ private fun exportSalesRecord(
                 append("<th>Petrol Sold (L)</th>")
                 append("<th>Petrol Rate (Rs)</th>")
                 append("<th>Petrol Revenue (Rs)</th>")
+                append("<th>Petrol Var (L)</th>")
+                append("<th>Petrol Stock (L)</th>")
                 append("<th>Diesel Sold (L)</th>")
                 append("<th>Diesel Rate (Rs)</th>")
                 append("<th>Diesel Revenue (Rs)</th>")
+                append("<th>Diesel Var (L)</th>")
+                append("<th>Diesel Stock (L)</th>")
                 append("<th>Grand Total Revenue (Rs)</th>")
                 append("<th>Cash Collected (Rs)</th>")
                 append("<th>Digital Collected (Rs)</th>")
@@ -766,9 +774,13 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">${record.totalPetrolSell}</td>")
                     append("<td class=\"number-cell\">${record.petrolPrice}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.totalPetrolRevenue)}</td>")
+                    append("<td class=\"number-cell\">${record.petrolVariation}</td>")
+                    append("<td class=\"number-cell\">${record.currentPetrolStorage}</td>")
                     append("<td class=\"number-cell\">${record.totalDieselSell}</td>")
                     append("<td class=\"number-cell\">${record.dieselPrice}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.totalDieselRevenue)}</td>")
+                    append("<td class=\"number-cell\">${record.dieselVariation}</td>")
+                    append("<td class=\"number-cell\">${record.currentDieselStorage}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
@@ -784,9 +796,13 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">$sumPetrolLitre</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumPetrolRev)}</td>")
+                    append("<td class=\"number-cell\">$sumPetrolVar</td>")
+                    append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">$sumDieselLitre</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumDieselRev)}</td>")
+                    append("<td class=\"number-cell\">$sumDieselVar</td>")
+                    append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumGrandRev)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumCash)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumDigital)}</td>")
