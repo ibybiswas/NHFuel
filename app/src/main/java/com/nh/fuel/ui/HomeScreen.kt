@@ -43,6 +43,7 @@ fun MainContainerScreen(
     record: DailyFuelRecord,
     allRecords: List<DailyFuelRecord> = emptyList(),
     allExpenses: List<ExpenseItem> = emptyList(),
+    allCredits: List<CreditRecord> = emptyList(),
     navBarOpacity: Float,
     themeMode: ThemeMode,
     onRecordChanged: (DailyFuelRecord) -> Unit,
@@ -50,7 +51,9 @@ fun MainContainerScreen(
     onOpacityChanged: (Float) -> Unit,
     onThemeModeChanged: (ThemeMode) -> Unit,
     onAddOrUpdateExpense: (ExpenseItem) -> Unit = {},
-    onDeleteExpense: (ExpenseItem) -> Unit = {}
+    onDeleteExpense: (ExpenseItem) -> Unit = {},
+    onAddOrUpdateCredit: (CreditRecord) -> Unit = {},
+    onDeleteCredit: (CreditRecord) -> Unit = {}
 ) {
     var selectedMainTab by remember { mutableStateOf(0) }
     var currentTimeString by remember { mutableStateOf("") }
@@ -91,11 +94,14 @@ fun MainContainerScreen(
                     bottomInset = bottomInset
                 )
                 2 -> PlaceholderTab("Reports & Analytics")
-                3 -> ExpendScreen(
+                3 -> FinanceScreen(
                     currentRecordDate = record.date,
                     allExpenses = allExpenses,
+                    allCredits = allCredits,
                     onAddOrUpdateExpense = onAddOrUpdateExpense,
                     onDeleteExpense = onDeleteExpense,
+                    onAddOrUpdateCredit = onAddOrUpdateCredit,
+                    onDeleteCredit = onDeleteCredit,
                     topInset = topInset,
                     bottomInset = bottomInset
                 )
@@ -236,7 +242,7 @@ private fun NHFuelBottomNav(
         Triple("Home", Icons.Default.Home, 0),
         Triple("Sales", Icons.Default.Payments, 1),
         Triple("Report", Icons.Default.Assessment, 2),
-        Triple("Expend", Icons.Default.AccountBalanceWallet, 3),
+        Triple("Finance", Icons.Default.AccountBalanceWallet, 3), // Renamed to Finance
         Triple("Setting", Icons.Default.Settings, 4)
     )
     val shape = RoundedCornerShape(28.dp)
@@ -1525,7 +1531,6 @@ fun NozzleRow(
             NumberField("Close", nozzle.close, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
         }
 
-        // Display Testing indicator badge below nozzle row if testing > 0
         if (nozzle.testing > 0.0 && !showTestingField) {
             Text(
                 text = "P.T - ${nozzle.testing}L",
