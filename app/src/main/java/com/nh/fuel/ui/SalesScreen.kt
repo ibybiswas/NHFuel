@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.nh.fuel.data.DailyFuelRecord
 import com.nh.fuel.data.DayShift
 import com.nh.fuel.data.DispenserShift
+import com.nh.fuel.data.ExpenseItem
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -43,6 +44,7 @@ enum class ExportFormat { XLS, CSV, HTML }
 fun SalesScreen(
     currentRecord: DailyFuelRecord,
     allRecords: List<DailyFuelRecord> = listOf(currentRecord),
+    allExpenses: List<ExpenseItem> = emptyList(),
     onRecordChanged: (DailyFuelRecord) -> Unit,
     onDateSelected: (String) -> Unit = {},
     topInset: Dp = 0.dp,
@@ -450,7 +452,7 @@ fun SalesScreen(
                     OutlinedButton(
                         onClick = {
                             showExportFormatDialog = false
-                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.XLS)
+                            exportSalesRecord(context, filteredRecords, allExpenses, periodDesc, ExportFormat.XLS)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -460,7 +462,7 @@ fun SalesScreen(
                     OutlinedButton(
                         onClick = {
                             showExportFormatDialog = false
-                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.CSV)
+                            exportSalesRecord(context, filteredRecords, allExpenses, periodDesc, ExportFormat.CSV)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -470,7 +472,7 @@ fun SalesScreen(
                     OutlinedButton(
                         onClick = {
                             showExportFormatDialog = false
-                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.HTML)
+                            exportSalesRecord(context, filteredRecords, allExpenses, periodDesc, ExportFormat.HTML)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -680,6 +682,7 @@ private fun formatSignedCurrency(amount: Double): String {
 private fun exportSalesRecord(
     context: Context,
     records: List<DailyFuelRecord>,
+    allExpenses: List<ExpenseItem>,
     periodDescription: String,
     format: ExportFormat
 ) {
@@ -700,21 +703,29 @@ private fun exportSalesRecord(
     val sumTotalCollected = records.sumOf { it.dailyTotalCollected }
     val sumMismatch = records.sumOf { it.dailyMismatch }
 
+    val sumExpenses = records.sumOf { record ->
+        allExpenses.filter { it.date == record.date }.sumOf { it.amount }
+    }
+    val sumNetVar = sumPetrolVar + sumDieselVar
+
     when (format) {
         ExportFormat.CSV -> {
             val csvBuilder = StringBuilder().apply {
                 append("NH Fuel Station Sales Report\n")
                 append("Report Period: $periodDescription\n\n")
-                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Petrol Var (L),Petrol Stock (L),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Diesel Var (L),Diesel Stock (L),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n")
+                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Petrol Stock (L),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Diesel Stock (L),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs),Petrol Var (L),Diesel Var (L),Net Var (L),Expenses (Rs)\n")
 
                 records.forEach { record ->
+                    val dayExpense = allExpenses.filter { it.date == record.date }.sumOf { it.amount }
+                    val netVar = record.petrolVariation + record.dieselVariation
                     val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
-                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.petrolVariation},${record.currentPetrolStorage},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${record.dieselVariation},${record.currentDieselStorage},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch\n")
+
+                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.currentPetrolStorage},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${record.currentDieselStorage},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch,${record.petrolVariation},${record.dieselVariation},$netVar,${formatCurrency(dayExpense)}\n")
                 }
 
                 if (isMultiDay) {
                     val rawSumMismatch = String.format(Locale.US, "%.2f", sumMismatch)
-                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},$sumPetrolVar,-,$sumDieselLitre,-,${formatCurrency(sumDieselRev)},$sumDieselVar,-,${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch\n")
+                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},-,$sumDieselLitre,-,${formatCurrency(sumDieselRev)},-,${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch,$sumPetrolVar,$sumDieselVar,$sumNetVar,${formatCurrency(sumExpenses)}\n")
                 }
             }
 
@@ -727,7 +738,7 @@ private fun exportSalesRecord(
         }
 
         ExportFormat.XLS, ExportFormat.HTML -> {
-            val totalColumns = 16
+            val totalColumns = 18
             val ext = if (format == ExportFormat.XLS) "xls" else "html"
             val mime = if (format == ExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
@@ -753,39 +764,46 @@ private fun exportSalesRecord(
                 append("<th>Petrol Sold (L)</th>")
                 append("<th>Petrol Rate (Rs)</th>")
                 append("<th>Petrol Revenue (Rs)</th>")
-                append("<th>Petrol Var (L)</th>")
                 append("<th>Petrol Stock (L)</th>")
                 append("<th>Diesel Sold (L)</th>")
                 append("<th>Diesel Rate (Rs)</th>")
                 append("<th>Diesel Revenue (Rs)</th>")
-                append("<th>Diesel Var (L)</th>")
                 append("<th>Diesel Stock (L)</th>")
                 append("<th>Grand Total Revenue (Rs)</th>")
                 append("<th>Cash Collected (Rs)</th>")
                 append("<th>Digital Collected (Rs)</th>")
                 append("<th>Total Payment Collected (Rs)</th>")
                 append("<th>Total Mismatch (Rs)</th>")
+                append("<th>Petrol Var (L)</th>")
+                append("<th>Diesel Var (L)</th>")
+                append("<th>Net Var (L)</th>")
+                append("<th>Expenses (Rs)</th>")
                 append("</tr>")
 
                 records.forEach { record ->
+                    val dayExpense = allExpenses.filter { it.date == record.date }.sumOf { it.amount }
+                    val netVar = record.petrolVariation + record.dieselVariation
                     val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
+
                     append("<tr>")
                     append("<td>${record.date}</td>")
                     append("<td class=\"number-cell\">${record.totalPetrolSell}</td>")
                     append("<td class=\"number-cell\">${record.petrolPrice}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.totalPetrolRevenue)}</td>")
-                    append("<td class=\"number-cell\">${record.petrolVariation}</td>")
                     append("<td class=\"number-cell\">${record.currentPetrolStorage}</td>")
                     append("<td class=\"number-cell\">${record.totalDieselSell}</td>")
                     append("<td class=\"number-cell\">${record.dieselPrice}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.totalDieselRevenue)}</td>")
-                    append("<td class=\"number-cell\">${record.dieselVariation}</td>")
                     append("<td class=\"number-cell\">${record.currentDieselStorage}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
                     append("<td class=\"number-cell\">$rawMismatch</td>")
+                    append("<td class=\"number-cell\">${record.petrolVariation}</td>")
+                    append("<td class=\"number-cell\">${record.dieselVariation}</td>")
+                    append("<td class=\"number-cell\">$netVar</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(dayExpense)}</td>")
                     append("</tr>")
                 }
 
@@ -796,18 +814,20 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">$sumPetrolLitre</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumPetrolRev)}</td>")
-                    append("<td class=\"number-cell\">$sumPetrolVar</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">$sumDieselLitre</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumDieselRev)}</td>")
-                    append("<td class=\"number-cell\">$sumDieselVar</td>")
                     append("<td class=\"number-cell\">-</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumGrandRev)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumCash)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumDigital)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumTotalCollected)}</td>")
                     append("<td class=\"number-cell\">$rawSumMismatch</td>")
+                    append("<td class=\"number-cell\">$sumPetrolVar</td>")
+                    append("<td class=\"number-cell\">$sumDieselVar</td>")
+                    append("<td class=\"number-cell\">$sumNetVar</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumExpenses)}</td>")
                     append("</tr>")
                 }
 
