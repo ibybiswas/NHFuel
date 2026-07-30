@@ -351,15 +351,25 @@ fun HomeScreenContent(
     var selectedShiftTab by remember { mutableStateOf(1) }
     var showDatePickerModal by remember { mutableStateOf(false) }
     var showSaveFullDayDialog by remember { mutableStateOf(false) }
+    var showTestingInputRow by remember { mutableStateOf(false) }
+    var showSaveTestingConfirmDialog by remember { mutableStateOf(false) }
+    var showUndoTestingDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(record.date) {
         selectedShiftTab = 1
+        showTestingInputRow = false
     }
 
     val isDark = isSystemInDarkTheme()
     val petrolColor = if (isDark) Color(0xFFFF8A80) else Color(0xFFC62828)
     val dieselColor = if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
     val stockColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+
+    val activeShift = when (selectedShiftTab) {
+        1 -> record.shift1
+        2 -> record.shift2
+        else -> record.shift3
+    }
 
     Column(
         modifier = Modifier
@@ -589,6 +599,68 @@ fun HomeScreenContent(
             )
         }
 
+        // PUMP TESTING ENABLE / DISABLE ROW (Placed above Shift Tabs as requested)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Build,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Enable Pump Testing (Calibration)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (activeShift.totalPetrolTesting > 0.0 || activeShift.totalDieselTesting > 0.0) {
+                        IconButton(
+                            onClick = { showUndoTestingDialog = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Undo,
+                                contentDescription = "Undo Testing",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = showTestingInputRow,
+                        onCheckedChange = { showTestingInputRow = it },
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+            }
+
+            if (activeShift.totalPetrolTesting > 0.0 || activeShift.totalDieselTesting > 0.0) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                Text(
+                    text = "Shift $selectedShiftTab Testing Recorded: Petrol ${activeShift.totalPetrolTesting} L | Diesel ${activeShift.totalDieselTesting} L (Returned to Tank)",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+
         TabRow(selectedTabIndex = selectedShiftTab - 1) {
             Tab(
                 selected = selectedShiftTab == 1,
@@ -609,18 +681,13 @@ fun HomeScreenContent(
             )
         }
 
-        val activeShift = when (selectedShiftTab) {
-            1 -> record.shift1
-            2 -> record.shift2
-            else -> record.shift3
-        }
-
         ShiftInputBlock(
             shiftTitle = "Shift $selectedShiftTab Readings",
             shiftNumber = selectedShiftTab,
             shift = activeShift,
             petrolColor = petrolColor,
             dieselColor = dieselColor,
+            showTestingFields = showTestingInputRow,
             onShiftUpdated = { updatedShift ->
                 val newRecord = when (selectedShiftTab) {
                     1 -> {
@@ -683,6 +750,20 @@ fun HomeScreenContent(
             }
         )
 
+        if (showTestingInputRow) {
+            Button(
+                onClick = { showSaveTestingConfirmDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Save Testing Readings", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
@@ -721,9 +802,9 @@ fun HomeScreenContent(
                     }
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                Text("Total 24H Full Day Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("  Total Petrol Sold: ${record.totalPetrolSell} Litre", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 13.sp)
-                Text("  Total Diesel Sold: ${record.totalDieselSell} Litre", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 13.sp)
+                Text("Total 24H Full Day Net Sales (Shift 1 + 2 + 3):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text("  Total Petrol Net Sold: ${record.totalPetrolSell} Litre (Testing: ${record.totalPetrolTesting} L)", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 12.sp)
+                Text("  Total Diesel Net Sold: ${record.totalDieselSell} Litre (Testing: ${record.totalDieselTesting} L)", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 12.sp)
             }
         }
 
@@ -751,6 +832,73 @@ fun HomeScreenContent(
         }
 
         Spacer(Modifier.height(bottomInset + 4.dp))
+    }
+
+    if (showSaveTestingConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveTestingConfirmDialog = false },
+            title = { Text("Save Pump Testing Readings?", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = {
+                Text(
+                    text = "This will deduct testing fuel (Petrol: ${activeShift.totalPetrolTesting} L, Diesel: ${activeShift.totalDieselTesting} L) from Net Sales and Revenue. Fuel will not be deducted from tank stock.",
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSaveTestingConfirmDialog = false
+                        showTestingInputRow = false
+                    }
+                ) { Text("Save & Hide", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveTestingConfirmDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showUndoTestingDialog) {
+        AlertDialog(
+            onDismissRequest = { showUndoTestingDialog = false },
+            title = { Text("Undo Shift $selectedShiftTab Testing Readings?", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+            text = {
+                Text(
+                    text = "Are you sure you want to reset testing values for Shift $selectedShiftTab to 0 L? This will restore sales and revenue calculations.",
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUndoTestingDialog = false
+                        val resetMpd1 = activeShift.mpd1.copy(
+                            petrolN2 = activeShift.mpd1.petrolN2.copy(testing = 0.0),
+                            petrolN3 = activeShift.mpd1.petrolN3.copy(testing = 0.0),
+                            dieselN1 = activeShift.mpd1.dieselN1.copy(testing = 0.0),
+                            dieselN4 = activeShift.mpd1.dieselN4.copy(testing = 0.0)
+                        )
+                        val resetMpd2 = activeShift.mpd2.copy(
+                            petrolN2 = activeShift.mpd2.petrolN2.copy(testing = 0.0),
+                            petrolN3 = activeShift.mpd2.petrolN3.copy(testing = 0.0),
+                            dieselN1 = activeShift.mpd2.dieselN1.copy(testing = 0.0),
+                            dieselN4 = activeShift.mpd2.dieselN4.copy(testing = 0.0)
+                        )
+                        val resetShift = activeShift.copy(mpd1 = resetMpd1, mpd2 = resetMpd2)
+
+                        val updatedRecord = when (selectedShiftTab) {
+                            1 -> record.copy(shift1 = resetShift)
+                            2 -> record.copy(shift2 = resetShift)
+                            else -> record.copy(shift3 = resetShift)
+                        }
+                        onRecordChanged(updatedRecord)
+                    }
+                ) { Text("Reset Testing", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUndoTestingDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showSaveFullDayDialog) {
@@ -809,7 +957,6 @@ fun HomeScreenContent(
                             )
                         )
 
-                        // Accurately carry forward ending stock levels, refills, and variations
                         val newNextDayRecord = DailyFuelRecord(
                             date = nextDateStr,
                             petrolTotal = record.currentPetrolStorage,
@@ -1196,6 +1343,7 @@ fun ShiftInputBlock(
     shift: DayShift,
     petrolColor: Color,
     dieselColor: Color,
+    showTestingFields: Boolean = false,
     onShiftUpdated: (DayShift) -> Unit
 ) {
     var showSkipWarningDialog by remember { mutableStateOf(false) }
@@ -1252,10 +1400,10 @@ fun ShiftInputBlock(
             }
         }
 
-        DispenserShiftCard("MPD 1", shift.mpd1, petrolColor, dieselColor) { updatedMpd1 ->
+        DispenserShiftCard("MPD 1", shift.mpd1, petrolColor, dieselColor, showTestingFields) { updatedMpd1 ->
             onShiftUpdated(shift.copy(mpd1 = updatedMpd1))
         }
-        DispenserShiftCard("MPD 2", shift.mpd2, petrolColor, dieselColor) { updatedMpd2 ->
+        DispenserShiftCard("MPD 2", shift.mpd2, petrolColor, dieselColor, showTestingFields) { updatedMpd2 ->
             onShiftUpdated(shift.copy(mpd2 = updatedMpd2))
         }
     }
@@ -1332,6 +1480,7 @@ fun DispenserShiftCard(
     dispenser: DispenserShift,
     petrolColor: Color,
     dieselColor: Color,
+    showTestingFields: Boolean = false,
     onUpdate: (DispenserShift) -> Unit
 ) {
     Card(
@@ -1345,13 +1494,13 @@ fun DispenserShiftCard(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Petrol (N2, N3)", fontWeight = FontWeight.Bold, color = petrolColor, fontSize = 11.sp)
-                    NozzleRow("N2", dispenser.petrolN2) { updated -> onUpdate(dispenser.copy(petrolN2 = updated)) }
-                    NozzleRow("N3", dispenser.petrolN3) { updated -> onUpdate(dispenser.copy(petrolN3 = updated)) }
+                    NozzleRow("N2", dispenser.petrolN2, showTestingFields) { updated -> onUpdate(dispenser.copy(petrolN2 = updated)) }
+                    NozzleRow("N3", dispenser.petrolN3, showTestingFields) { updated -> onUpdate(dispenser.copy(petrolN3 = updated)) }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Diesel (N1, N4)", fontWeight = FontWeight.Bold, color = dieselColor, fontSize = 11.sp)
-                    NozzleRow("N1", dispenser.dieselN1) { updated -> onUpdate(dispenser.copy(dieselN1 = updated)) }
-                    NozzleRow("N4", dispenser.dieselN4) { updated -> onUpdate(dispenser.copy(dieselN4 = updated)) }
+                    NozzleRow("N1", dispenser.dieselN1, showTestingFields) { updated -> onUpdate(dispenser.copy(dieselN1 = updated)) }
+                    NozzleRow("N4", dispenser.dieselN4, showTestingFields) { updated -> onUpdate(dispenser.copy(dieselN4 = updated)) }
                 }
             }
         }
@@ -1362,16 +1511,30 @@ fun DispenserShiftCard(
 fun NozzleRow(
     nozzleLabel: String,
     nozzle: NozzleShift,
+    showTestingField: Boolean = false,
     onChange: (NozzleShift) -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.padding(vertical = 2.dp)
-    ) {
-        Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
-        NumberField("Open", nozzle.open, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
-        NumberField("Close", nozzle.close, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
+    Column(modifier = Modifier.padding(vertical = 2.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(nozzleLabel, fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
+            NumberField("Open", nozzle.open, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(open = it)) }
+            NumberField("Close", nozzle.close, openValue = nozzle.open, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(close = it)) }
+        }
+
+        if (showTestingField) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(top = 2.dp)
+            ) {
+                Text("Test L", fontSize = 8.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                NumberField("Testing L", nozzle.testing, modifier = Modifier.weight(1f)) { onChange(nozzle.copy(testing = it)) }
+            }
+        }
     }
 }
 
