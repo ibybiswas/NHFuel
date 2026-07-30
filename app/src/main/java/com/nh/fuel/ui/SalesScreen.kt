@@ -36,6 +36,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class PeriodFilter { DAY, WEEK, MONTH, YEAR, CUSTOM }
+enum class ExportFormat { XLS, CSV, HTML }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +55,7 @@ fun SalesScreen(
 
     var selectedPeriod by remember { mutableStateOf(PeriodFilter.DAY) }
     var showDatePickerModal by remember { mutableStateOf(false) }
+    var showExportFormatDialog by remember { mutableStateOf(false) }
 
     var fromDateInput by remember { mutableStateOf(currentRecord.date) }
     var toDateInput by remember { mutableStateOf(currentRecord.date) }
@@ -124,6 +126,16 @@ fun SalesScreen(
             add(Calendar.DAY_OF_MONTH, daysOffset)
         }
         onDateSelected(sdf.format(cal.time))
+    }
+
+    val periodDesc = remember(selectedPeriod, currentRecord.date, fromDateInput, toDateInput) {
+        when (selectedPeriod) {
+            PeriodFilter.DAY -> "Day: ${currentRecord.date}"
+            PeriodFilter.WEEK -> "Week Ending: ${currentRecord.date}"
+            PeriodFilter.MONTH -> "Month: ${currentRecord.date.take(7)}"
+            PeriodFilter.YEAR -> "Year: ${currentRecord.date.take(4)}"
+            PeriodFilter.CUSTOM -> "Custom Period: $fromDateInput to $toDateInput"
+        }
     }
 
     Column(
@@ -382,16 +394,7 @@ fun SalesScreen(
         }
 
         Button(
-            onClick = {
-                val periodDesc = when (selectedPeriod) {
-                    PeriodFilter.DAY -> "Day: ${currentRecord.date}"
-                    PeriodFilter.WEEK -> "Week Ending: ${currentRecord.date}"
-                    PeriodFilter.MONTH -> "Month: ${currentRecord.date.take(7)}"
-                    PeriodFilter.YEAR -> "Year: ${currentRecord.date.take(4)}"
-                    PeriodFilter.CUSTOM -> "Custom Period: $fromDateInput to $toDateInput"
-                }
-                exportSalesToExcel(context, filteredRecords, periodDesc)
-            },
+            onClick = { showExportFormatDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(46.dp),
@@ -399,12 +402,13 @@ fun SalesScreen(
         ) {
             Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Export Sales Report (.XLS / Excel)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("Export Sales Report", fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
         Spacer(Modifier.height(bottomInset + 4.dp))
     }
 
+    // Material 3 Date Picker Dialog
     if (showDatePickerModal) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -424,6 +428,65 @@ fun SalesScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    // 3-Option Export Selection Dialog (.XLS, .CSV, .HTML)
+    if (showExportFormatDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportFormatDialog = false },
+            title = {
+                Text(
+                    text = "Choose Export Format",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Select your preferred file format for $periodDesc:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportFormatDialog = false
+                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.XLS)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(".XLS (Excel Table with Styled Borders)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportFormatDialog = false
+                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.CSV)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(".CSV (Plain Text Spreadsheet)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportFormatDialog = false
+                            exportSalesRecord(context, filteredRecords, periodDesc, ExportFormat.HTML)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(".HTML (Formatted Web Document)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportFormatDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -616,69 +679,111 @@ private fun formatSignedCurrency(amount: Double): String {
     return "$sign₹ ${String.format(Locale.getDefault(), "%.2f", amount)}"
 }
 
-private fun exportSalesToExcel(context: Context, records: List<DailyFuelRecord>, periodDescription: String) {
-    val totalColumns = 12
+/** Unified Export Manager for XLS, CSV, and HTML */
+private fun exportSalesRecord(
+    context: Context,
+    records: List<DailyFuelRecord>,
+    periodDescription: String,
+    format: ExportFormat
+) {
+    val fileTimestamp = System.currentTimeMillis()
 
-    val htmlBuilder = StringBuilder().apply {
-        append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>")
-        append("table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }")
-        append("th, td { border: 1px solid #444444; padding: 6px 10px; text-align: left; }")
-        append(".report-title { background-color: #1A237E; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; }")
-        append(".period-title { background-color: #E8EAF6; color: #1A237E; font-size: 12px; font-weight: bold; text-align: center; }")
-        append(".header-row th { background-color: #1565C0; color: #FFFFFF; font-weight: bold; text-align: center; }")
-        append(".number-cell { text-align: right; }")
-        append("</style></head><body>")
-        
-        append("<table>")
-        
-        append("<tr><td colspan=\"$totalColumns\" class=\"report-title\">NH Fuel Station Sales Report</td></tr>")
-        append("<tr><td colspan=\"$totalColumns\" class=\"period-title\">Report Period: $periodDescription</td></tr>")
-        append("<tr><td colspan=\"$totalColumns\" style=\"border: none;\"></td></tr>")
+    when (format) {
+        ExportFormat.CSV -> {
+            val csvBuilder = StringBuilder().apply {
+                append("NH Fuel Station Sales Report\n")
+                append("Report Period: $periodDescription\n\n")
+                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs)\n")
 
-        append("<tr class=\"header-row\">")
-        append("<th>Date</th>")
-        append("<th>Petrol Sold (L)</th>")
-        append("<th>Petrol Rate (Rs)</th>")
-        append("<th>Petrol Revenue (Rs)</th>")
-        append("<th>Diesel Sold (L)</th>")
-        append("<th>Diesel Rate (Rs)</th>")
-        append("<th>Diesel Revenue (Rs)</th>")
-        append("<th>Grand Total Revenue (Rs)</th>")
-        append("<th>Cash Collected (Rs)</th>")
-        append("<th>Digital Collected (Rs)</th>")
-        append("<th>Total Payment Collected (Rs)</th>")
-        append("<th>Total Mismatch (Rs)</th>")
-        append("</tr>")
+                records.forEach { record ->
+                    val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
+                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch\n")
+                }
+            }
 
-        records.forEach { record ->
-            val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
-            append("<tr>")
-            append("<td>${record.date}</td>")
-            append("<td class=\"number-cell\">${record.totalPetrolSell}</td>")
-            append("<td class=\"number-cell\">${record.petrolPrice}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.totalPetrolRevenue)}</td>")
-            append("<td class=\"number-cell\">${record.totalDieselSell}</td>")
-            append("<td class=\"number-cell\">${record.dieselPrice}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.totalDieselRevenue)}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
-            append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
-            append("<td class=\"number-cell\">$rawMismatch</td>")
-            append("</tr>")
+            shareExportedFile(
+                context = context,
+                fileContent = csvBuilder.toString(),
+                fileName = "NHFuel_Sales_Report_$fileTimestamp.csv",
+                mimeType = "text/csv"
+            )
         }
 
-        append("</table></body></html>")
-    }
+        ExportFormat.XLS, ExportFormat.HTML -> {
+            val totalColumns = 12
+            val ext = if (format == ExportFormat.XLS) "xls" else "html"
+            val mime = if (format == ExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
+            val htmlContent = StringBuilder().apply {
+                append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">")
+                append("<title>NH Fuel Station Sales Report</title><style>")
+                append("table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; width: 100%; }")
+                append("th, td { border: 1px solid #444444; padding: 6px 10px; text-align: left; }")
+                append(".report-title { background-color: #1A237E; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; }")
+                append(".period-title { background-color: #E8EAF6; color: #1A237E; font-size: 12px; font-weight: bold; text-align: center; }")
+                append(".header-row th { background-color: #1565C0; color: #FFFFFF; font-weight: bold; text-align: center; }")
+                append(".number-cell { text-align: right; }")
+                append("</style></head><body>")
+
+                append("<table>")
+                append("<tr><td colspan=\"$totalColumns\" class=\"report-title\">NH Fuel Station Sales Report</td></tr>")
+                append("<tr><td colspan=\"$totalColumns\" class=\"period-title\">Report Period: $periodDescription</td></tr>")
+                append("<tr><td colspan=\"$totalColumns\" style=\"border: none; height: 10px;\"></td></tr>")
+
+                append("<tr class=\"header-row\">")
+                append("<th>Date</th>")
+                append("<th>Petrol Sold (L)</th>")
+                append("<th>Petrol Rate (Rs)</th>")
+                append("<th>Petrol Revenue (Rs)</th>")
+                append("<th>Diesel Sold (L)</th>")
+                append("<th>Diesel Rate (Rs)</th>")
+                append("<th>Diesel Revenue (Rs)</th>")
+                append("<th>Grand Total Revenue (Rs)</th>")
+                append("<th>Cash Collected (Rs)</th>")
+                append("<th>Digital Collected (Rs)</th>")
+                append("<th>Total Payment Collected (Rs)</th>")
+                append("<th>Total Mismatch (Rs)</th>")
+                append("</tr>")
+
+                records.forEach { record ->
+                    val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
+                    append("<tr>")
+                    append("<td>${record.date}</td>")
+                    append("<td class=\"number-cell\">${record.totalPetrolSell}</td>")
+                    append("<td class=\"number-cell\">${record.petrolPrice}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.totalPetrolRevenue)}</td>")
+                    append("<td class=\"number-cell\">${record.totalDieselSell}</td>")
+                    append("<td class=\"number-cell\">${record.dieselPrice}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.totalDieselRevenue)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
+                    append("<td class=\"number-cell\">$rawMismatch</td>")
+                    append("</tr>")
+                }
+
+                append("</table></body></html>")
+            }
+
+            shareExportedFile(
+                context = context,
+                fileContent = htmlContent.toString(),
+                fileName = "NHFuel_Sales_Report_${fileTimestamp}.$ext",
+                mimeType = mime
+            )
+        }
+    }
+}
+
+private fun shareExportedFile(context: Context, fileContent: String, fileName: String, mimeType: String) {
     try {
-        val fileName = "NHFuel_Sales_Report_${System.currentTimeMillis()}.xls"
         val file = File(context.cacheDir, fileName)
-        file.writeText(htmlBuilder.toString(), Charsets.UTF_8)
+        file.writeText(fileContent, Charsets.UTF_8)
 
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/vnd.ms-excel"
+            type = mimeType
             putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Sales Report")
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
