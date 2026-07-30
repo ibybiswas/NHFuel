@@ -2,6 +2,7 @@ package com.nh.fuel.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,8 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+enum class ExpensePeriodFilter { ALL_TIME, THIS_MONTH, THIS_YEAR, CUSTOM }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanceScreen(
@@ -39,18 +42,7 @@ fun FinanceScreen(
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp
 ) {
-    var selectedSubTab by remember { mutableStateOf(0) } // 0: Expenses, 1: Credit / Lend
-    var showDatePickerModal by remember { mutableStateOf(false) }
-
-    fun navigateDate(daysOffset: Int) {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val parsedDate = try { sdf.parse(currentRecordDate) ?: Date() } catch (e: Exception) { Date() }
-        val cal = Calendar.getInstance().apply {
-            time = parsedDate
-            add(Calendar.DAY_OF_MONTH, daysOffset)
-        }
-        onDateSelected(sdf.format(cal.time))
-    }
+    var selectedSubTab by remember { mutableStateOf(0) } // 0: Expenses, 1: Credit / Lend Ledger
 
     Column(
         modifier = Modifier
@@ -65,53 +57,6 @@ fun FinanceScreen(
             fontSize = 18.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
-
-        Spacer(Modifier.height(8.dp))
-
-        // Date Picker Bar for Finance Tab
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedButton(
-                onClick = { navigateDate(-1) },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Prev Day", modifier = Modifier.size(16.dp))
-                Text("Prev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = currentRecordDate,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                IconButton(
-                    onClick = { showDatePickerModal = true },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Select Date",
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-
-            OutlinedButton(
-                onClick = { navigateDate(1) },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text("Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ChevronRight, contentDescription = "Next Day", modifier = Modifier.size(16.dp))
-            }
-        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -149,6 +94,315 @@ fun FinanceScreen(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpendScreenContent(
+    currentRecordDate: String,
+    allExpenses: List<ExpenseItem>,
+    onAddOrUpdateExpense: (ExpenseItem) -> Unit,
+    onDeleteExpense: (ExpenseItem) -> Unit,
+    bottomInset: Dp
+) {
+    var descriptionInput by remember { mutableStateOf("") }
+    var amountInput by remember { mutableStateOf("") }
+    var expenseDateInput by remember(currentRecordDate) { mutableStateOf(currentRecordDate) }
+    var showDatePickerModal by remember { mutableStateOf(false) }
+
+    var editingExpense by remember { mutableStateOf<ExpenseItem?>(null) }
+    var selectedAggFilter by remember { mutableStateOf(ExpensePeriodFilter.ALL_TIME) }
+    var customFromDate by remember { mutableStateOf(currentRecordDate) }
+    var customToDate by remember { mutableStateOf(currentRecordDate) }
+
+    val dayExpenses = remember(allExpenses, currentRecordDate) {
+        allExpenses.filter { it.date == currentRecordDate }
+    }
+    val totalDayExpense = remember(dayExpenses) {
+        dayExpenses.sumOf { it.amount }
+    }
+
+    val aggregatedExpenseTotal = remember(allExpenses, selectedAggFilter, currentRecordDate, customFromDate, customToDate) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        when (selectedAggFilter) {
+            ExpensePeriodFilter.ALL_TIME -> allExpenses.sumOf { it.amount }
+            ExpensePeriodFilter.THIS_MONTH -> {
+                val currentMonth = currentRecordDate.take(7)
+                allExpenses.filter { it.date.startsWith(currentMonth) }.sumOf { it.amount }
+            }
+            ExpensePeriodFilter.THIS_YEAR -> {
+                val currentYear = currentRecordDate.take(4)
+                allExpenses.filter { it.date.startsWith(currentYear) }.sumOf { it.amount }
+            }
+            ExpensePeriodFilter.CUSTOM -> {
+                val fromD = try { sdf.parse(customFromDate) } catch (e: Exception) { null }
+                val toD = try { sdf.parse(customToDate) } catch (e: Exception) { null }
+                if (fromD != null && toD != null) {
+                    allExpenses.filter { exp ->
+                        val expD = try { sdf.parse(exp.date) } catch (e: Exception) { null }
+                        expD != null && !expD.before(fromD) && !expD.after(toD)
+                    }.sumOf { it.amount }
+                } else allExpenses.sumOf { it.amount }
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
+    ) {
+        // Add New Expense Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Add New Expense",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    OutlinedTextField(
+                        value = descriptionInput,
+                        onValueChange = { descriptionInput = it },
+                        label = { Text("Expense Description * (e.g. Tea/Snacks, Generator Repair)", fontSize = 11.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = amountInput,
+                            onValueChange = { amountInput = it },
+                            label = { Text("Amount (₹)", fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        OutlinedTextField(
+                            value = expenseDateInput,
+                            onValueChange = { expenseDateInput = it },
+                            label = { Text("Date", fontSize = 11.sp) },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = { showDatePickerModal = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = "Pick Date",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val amount = amountInput.toDoubleOrNull() ?: 0.0
+                            if (descriptionInput.isNotBlank() && amount > 0.0) {
+                                val nowTimeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+                                onAddOrUpdateExpense(
+                                    ExpenseItem(
+                                        date = expenseDateInput.ifBlank { currentRecordDate },
+                                        description = descriptionInput.trim(),
+                                        amount = amount,
+                                        timestamp = nowTimeStr
+                                    )
+                                )
+                                descriptionInput = ""
+                                amountInput = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Save Expense", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        // Aggregated Expenses Summary Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Aggregated Expenses ($currentRecordDate):",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${selectedAggFilter.name.replace("_", " ")} Total",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", totalDayExpense)}",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", aggregatedExpenseTotal)}",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        ExpensePeriodFilter.values().forEach { filter ->
+                            FilterChip(
+                                selected = selectedAggFilter == filter,
+                                onClick = { selectedAggFilter = filter },
+                                label = { Text(filter.name.replace("_", " "), fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                            )
+                        }
+                    }
+
+                    if (selectedAggFilter == ExpensePeriodFilter.CUSTOM) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = customFromDate,
+                                onValueChange = { customFromDate = it },
+                                label = { Text("From Date", fontSize = 8.sp) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = customToDate,
+                                onValueChange = { customToDate = it },
+                                label = { Text("To Date", fontSize = 8.sp) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "Expense Log (${dayExpenses.size} items for $currentRecordDate):",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        // Expense Item Card Blocks
+        items(dayExpenses, key = { it.id }) { item ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = item.description,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (item.timestamp.isNotBlank()) "Logged @ ${item.timestamp}" else "Logged for ${item.date}",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+
+                        IconButton(
+                            onClick = { editingExpense = item },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Expense",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { onDeleteExpense(item) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete Expense",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if (showDatePickerModal) {
         val datePickerState = rememberDatePickerState()
@@ -159,7 +413,7 @@ fun FinanceScreen(
                     showDatePickerModal = false
                     datePickerState.selectedDateMillis?.let { millis ->
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        onDateSelected(sdf.format(Date(millis)))
+                        expenseDateInput = sdf.format(Date(millis))
                     }
                 }) { Text("Select Date", fontWeight = FontWeight.Bold) }
             },
@@ -170,115 +424,76 @@ fun FinanceScreen(
             DatePicker(state = datePickerState)
         }
     }
+
+    editingExpense?.let { expense ->
+        EditExpenseDetailsDialog(
+            expense = expense,
+            onDismiss = { editingExpense = null },
+            onSave = { updatedExpense ->
+                onAddOrUpdateExpense(updatedExpense)
+                editingExpense = null
+            }
+        )
+    }
 }
 
 @Composable
-fun ExpendScreenContent(
-    currentRecordDate: String,
-    allExpenses: List<ExpenseItem>,
-    onAddOrUpdateExpense: (ExpenseItem) -> Unit,
-    onDeleteExpense: (ExpenseItem) -> Unit,
-    bottomInset: Dp
+private fun EditExpenseDetailsDialog(
+    expense: ExpenseItem,
+    onDismiss: () -> Unit,
+    onSave: (ExpenseItem) -> Unit
 ) {
-    var titleInput by remember { mutableStateOf("") }
-    var amountInput by remember { mutableStateOf("") }
+    var descText by remember { mutableStateOf(expense.description) }
+    var amountText by remember { mutableStateOf(expense.amount.toString()) }
+    var dateText by remember { mutableStateOf(expense.date) }
 
-    val dayExpenses = remember(allExpenses, currentRecordDate) {
-        allExpenses.filter { it.date == currentRecordDate }
-    }
-    val totalDayExpense = remember(dayExpenses) {
-        dayExpenses.sumOf { it.amount }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-        ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-                Text("Total Expenses ($currentRecordDate)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Text("₹ ${String.format(Locale.getDefault(), "%.2f", totalDayExpense)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Expense Details", fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = descText,
+                    onValueChange = { descText = it },
+                    label = { Text("Description *", fontSize = 10.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount (₹)", fontSize = 10.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (YYYY-MM-DD)", fontSize = 10.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Add New Expense", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = titleInput,
-                        onValueChange = { titleInput = it },
-                        label = { Text("Expense Title", fontSize = 9.sp) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = amountInput,
-                        onValueChange = { amountInput = it },
-                        label = { Text("Amount (₹)", fontSize = 9.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
+        },
+        confirmButton = {
+            Button(onClick = {
+                val newAmount = amountText.toDoubleOrNull() ?: expense.amount
+                if (descText.isNotBlank() && newAmount > 0.0) {
+                    onSave(
+                        expense.copy(
+                            description = descText.trim(),
+                            amount = newAmount,
+                            date = dateText.trim()
+                        )
                     )
                 }
-                Button(
-                    onClick = {
-                        val amount = amountInput.toDoubleOrNull() ?: 0.0
-                        if (titleInput.isNotBlank() && amount > 0.0) {
-                            onAddOrUpdateExpense(
-                                ExpenseItem(
-                                    date = currentRecordDate,
-                                    description = titleInput.trim(),
-                                    amount = amount
-                                )
-                            )
-                            titleInput = ""
-                            amountInput = ""
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text("Add Expense", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
-            }
+            }) { Text("Save Changes", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(bottom = bottomInset + 8.dp)
-        ) {
-            items(dayExpenses, key = { it.id }) { item ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(item.description, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("₹ ${String.format(Locale.getDefault(), "%.2f", item.amount)}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
-                            IconButton(onClick = { onDeleteExpense(item) }, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete Expense", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
