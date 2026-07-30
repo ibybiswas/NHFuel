@@ -117,6 +117,7 @@ fun SalesScreen(
 
     val totalCashCollected = filteredRecords.sumOf { it.dailyCashCollected }
     val totalDigitalCollected = filteredRecords.sumOf { it.dailyDigitalCollected }
+    val totalCreditCollected = filteredRecords.sumOf { it.dailyCreditCollected }
     val totalCollected = filteredRecords.sumOf { it.dailyTotalCollected }
     val totalMismatch = filteredRecords.sumOf { it.dailyMismatch }
 
@@ -363,19 +364,25 @@ fun SalesScreen(
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
                 Text(
-                    text = "• Total Cash Collected: ₹ ${formatCurrency(totalCashCollected)}",
+                    text = "• Cash Collected: ₹ ${formatCurrency(totalCashCollected)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "• Total Digital Collected: ₹ ${formatCurrency(totalDigitalCollected)}",
+                    text = "• Digital Collected: ₹ ${formatCurrency(totalDigitalCollected)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "• Total Payment Collected: ₹ ${formatCurrency(totalCollected)}",
+                    text = "• Credit (Lend) Given: ₹ ${formatCurrency(totalCreditCollected)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "• Total Payment Settled: ₹ ${formatCurrency(totalCollected)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
@@ -604,6 +611,9 @@ private fun MpdSalesColumn(
     var digitalText by remember(dispenser.digitalCollected) {
         mutableStateOf(if (dispenser.digitalCollected == 0.0) "" else dispenser.digitalCollected.toString())
     }
+    var creditText by remember(dispenser.creditCollected) {
+        mutableStateOf(if (dispenser.creditCollected == 0.0) "" else dispenser.creditCollected.toString())
+    }
 
     Card(
         modifier = modifier.border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp)),
@@ -643,6 +653,21 @@ private fun MpdSalesColumn(
                     }
                 },
                 label = { Text("Digital ₹", fontSize = 8.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = creditText,
+                onValueChange = { input ->
+                    if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        creditText = input
+                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        onDispenserUpdated(dispenser.copy(creditCollected = parsed))
+                    }
+                },
+                label = { Text("Credit (Lend) ₹", fontSize = 8.sp) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -700,6 +725,7 @@ private fun exportSalesRecord(
     val sumGrandRev = records.sumOf { it.grandTotalRevenue }
     val sumCash = records.sumOf { it.dailyCashCollected }
     val sumDigital = records.sumOf { it.dailyDigitalCollected }
+    val sumCredit = records.sumOf { it.dailyCreditCollected }
     val sumTotalCollected = records.sumOf { it.dailyTotalCollected }
     val sumMismatch = records.sumOf { it.dailyMismatch }
 
@@ -713,19 +739,19 @@ private fun exportSalesRecord(
             val csvBuilder = StringBuilder().apply {
                 append("NH Fuel Station Sales Report\n")
                 append("Report Period: $periodDescription\n\n")
-                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Petrol Stock (L),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Diesel Stock (L),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Total Payment Collected (Rs),Total Mismatch (Rs),Petrol Var (L),Diesel Var (L),Net Var (L),Expenses (Rs)\n")
+                append("Date,Petrol Sold (L),Petrol Rate (Rs),Petrol Revenue (Rs),Petrol Stock (L),Diesel Sold (L),Diesel Rate (Rs),Diesel Revenue (Rs),Diesel Stock (L),Grand Total Revenue (Rs),Cash Collected (Rs),Digital Collected (Rs),Credit (Lend) (Rs),Total Payment Collected (Rs),Total Mismatch (Rs),Petrol Var (L),Diesel Var (L),Net Var (L),Expenses (Rs)\n")
 
                 records.forEach { record ->
                     val dayExpense = allExpenses.filter { it.date == record.date }.sumOf { it.amount }
                     val netVar = record.petrolVariation + record.dieselVariation
                     val rawMismatch = String.format(Locale.US, "%.2f", record.dailyMismatch)
 
-                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.currentPetrolStorage},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${record.currentDieselStorage},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch,${record.petrolVariation},${record.dieselVariation},$netVar,${formatCurrency(dayExpense)}\n")
+                    append("${record.date},${record.totalPetrolSell},${record.petrolPrice},${formatCurrency(record.totalPetrolRevenue)},${record.currentPetrolStorage},${record.totalDieselSell},${record.dieselPrice},${formatCurrency(record.totalDieselRevenue)},${record.currentDieselStorage},${formatCurrency(record.grandTotalRevenue)},${formatCurrency(record.dailyCashCollected)},${formatCurrency(record.dailyDigitalCollected)},${formatCurrency(record.dailyCreditCollected)},${formatCurrency(record.dailyTotalCollected)},$rawMismatch,${record.petrolVariation},${record.dieselVariation},$netVar,${formatCurrency(dayExpense)}\n")
                 }
 
                 if (isMultiDay) {
                     val rawSumMismatch = String.format(Locale.US, "%.2f", sumMismatch)
-                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},-,$sumDieselLitre,-,${formatCurrency(sumDieselRev)},-,${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumTotalCollected)},$rawSumMismatch,$sumPetrolVar,$sumDieselVar,$sumNetVar,${formatCurrency(sumExpenses)}\n")
+                    append("GRAND TOTAL,$sumPetrolLitre,-,${formatCurrency(sumPetrolRev)},-,$sumDieselLitre,-,${formatCurrency(sumDieselRev)},-,${formatCurrency(sumGrandRev)},${formatCurrency(sumCash)},${formatCurrency(sumDigital)},${formatCurrency(sumCredit)},${formatCurrency(sumTotalCollected)},$rawSumMismatch,$sumPetrolVar,$sumDieselVar,$sumNetVar,${formatCurrency(sumExpenses)}\n")
                 }
             }
 
@@ -738,7 +764,7 @@ private fun exportSalesRecord(
         }
 
         ExportFormat.XLS, ExportFormat.HTML -> {
-            val totalColumns = 18
+            val totalColumns = 19
             val ext = if (format == ExportFormat.XLS) "xls" else "html"
             val mime = if (format == ExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
@@ -772,6 +798,7 @@ private fun exportSalesRecord(
                 append("<th>Grand Total Revenue (Rs)</th>")
                 append("<th>Cash Collected (Rs)</th>")
                 append("<th>Digital Collected (Rs)</th>")
+                append("<th>Credit (Lend) (Rs)</th>")
                 append("<th>Total Payment Collected (Rs)</th>")
                 append("<th>Total Mismatch (Rs)</th>")
                 append("<th>Petrol Var (L)</th>")
@@ -798,6 +825,7 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">${formatCurrency(record.grandTotalRevenue)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyCashCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyDigitalCollected)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(record.dailyCreditCollected)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(record.dailyTotalCollected)}</td>")
                     append("<td class=\"number-cell\">$rawMismatch</td>")
                     append("<td class=\"number-cell\">${record.petrolVariation}</td>")
@@ -822,6 +850,7 @@ private fun exportSalesRecord(
                     append("<td class=\"number-cell\">${formatCurrency(sumGrandRev)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumCash)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumDigital)}</td>")
+                    append("<td class=\"number-cell\">${formatCurrency(sumCredit)}</td>")
                     append("<td class=\"number-cell\">${formatCurrency(sumTotalCollected)}</td>")
                     append("<td class=\"number-cell\">$rawSumMismatch</td>")
                     append("<td class=\"number-cell\">$sumPetrolVar</td>")
