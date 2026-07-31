@@ -2,6 +2,10 @@ package com.nh.fuel.ui
 
 import android.content.Context
 import android.content.Intent
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,7 +36,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class ReportPeriodFilter { TODAY, YESTERDAY, THIS_WEEK, THIS_MONTH, CUSTOM }
-enum class ReportExportFormat { XLS, PDF_HTML }
+enum class ReportExportFormat { XLS, PDF }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +56,6 @@ fun ReportScreen(
     var customFromDate by remember { mutableStateOf(currentRecordDate) }
     var customToDate by remember { mutableStateOf(currentRecordDate) }
 
-    // Filter Records based on Period Selection (Using exact Business Day logic)
     val filteredRecords = remember(selectedPeriod, currentRecordDate, customFromDate, customToDate, allRecords) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val targetDate = try { sdf.parse(currentRecordDate) ?: Date() } catch (e: Exception) { Date() }
@@ -97,7 +100,6 @@ fun ReportScreen(
         else allExpenses.filter { it.date in periodDates }
     }
 
-    // Key Business Calculations
     val totalPetrolLitre = filteredRecords.sumOf { it.totalPetrolSell }
     val totalDieselLitre = filteredRecords.sumOf { it.totalDieselSell }
     val totalVolumeLitre = totalPetrolLitre + totalDieselLitre
@@ -454,7 +456,7 @@ fun ReportScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(".XLS (Excel Workbook with Visual SVG Charts)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(".XLS (Excel Spreadsheet with Charts)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
 
                     OutlinedButton(
@@ -479,12 +481,12 @@ fun ReportScreen(
                                 totalPetrolVariation = totalPetrolVariation,
                                 totalDieselVariation = totalDieselVariation,
                                 netTotalVariation = netTotalVariation,
-                                format = ReportExportFormat.PDF_HTML
+                                format = ReportExportFormat.PDF
                             )
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(".PDF / Styled Document (Visual Infographic)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(".PDF (Native Printable Document)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             },
@@ -659,6 +661,23 @@ private fun formatVal(value: Double): String {
     return String.format(Locale.getDefault(), "%.2f", value)
 }
 
+private fun generateSvgPieChart(petrolPct: Double, dieselPct: Double): String {
+    val pDeg = (petrolPct / 100.0) * 360.0
+    val dDeg = 360.0 - pDeg
+
+    val pRad = Math.toRadians(pDeg - 90)
+    val x = 100 + 80 * Math.cos(pRad)
+    val y = 100 + 80 * Math.sin(pRad)
+    val largeArc = if (pDeg > 180) 1 else 0
+
+    return """
+        <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="#29B6F6" />
+            <path d="M100,100 L100,20 A80,80 0 $largeArc,1 $x,$y Z" fill="#FF9800" />
+        </svg>
+    """.trimIndent()
+}
+
 private fun exportReportDashboard(
     context: Context,
     periodDescription: String,
@@ -681,21 +700,22 @@ private fun exportReportDashboard(
     format: ReportExportFormat
 ) {
     val fileTimestamp = System.currentTimeMillis()
-    val ext = if (format == ReportExportFormat.XLS) "xls" else "html"
-    val mime = if (format == ReportExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
     val totalVol = if (totalVolumeLitre > 0) totalVolumeLitre else 1.0
-    val pVolPct = String.format(Locale.US, "%.2f", (totalPetrolLitre / totalVol) * 100)
-    val dVolPct = String.format(Locale.US, "%.2f", (totalDieselLitre / totalVol) * 100)
+    val pVolPct = (totalPetrolLitre / totalVol) * 100
+    val dVolPct = (totalDieselLitre / totalVol) * 100
 
     val totalRev = if (grossRevenue > 0) grossRevenue else 1.0
-    val pRevPct = String.format(Locale.US, "%.2f", (totalPetrolRev / totalRev) * 100)
-    val dRevPct = String.format(Locale.US, "%.2f", (totalDieselRev / totalRev) * 100)
+    val pRevPct = (totalPetrolRev / totalRev) * 100
+    val dRevPct = (totalDieselRev / totalRev) * 100
+
+    val revPieSvg = generateSvgPieChart(pRevPct, dRevPct)
+    val volPieSvg = generateSvgPieChart(pVolPct, dVolPct)
 
     val htmlContent = StringBuilder().apply {
         append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">")
         append("<title>NH Fuel Station Executive Report</title><style>")
-        append("body { font-family: Arial, sans-serif; font-size: 13px; background-color: #F5F5F5; padding: 15px; }")
+        append("body { font-family: Arial, sans-serif; font-size: 13px; background-color: #FFFFFF; padding: 15px; }")
         append(".container { max-width: 800px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; padding: 20px; border: 1px solid #DDDDDD; }")
         append(".header { text-align: center; background: #1A237E; color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; }")
         append(".kpi-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }")
@@ -703,6 +723,7 @@ private fun exportReportDashboard(
         append(".kpi-title { font-size: 11px; font-weight: bold; color: #666666; }")
         append(".kpi-value { font-size: 18px; font-weight: bold; margin-top: 4px; }")
         append(".section-title { font-size: 14px; font-weight: bold; color: #1A237E; border-bottom: 2px solid #1A237E; padding-bottom: 4px; margin-top: 15px; margin-bottom: 10px; }")
+        append(".chart-box { display: flex; align-items: center; justify-content: space-around; background: #F8F9FA; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #E0E0E0; }")
         append("table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }")
         append("th, td { border: 1px solid #DDDDDD; padding: 8px 12px; text-align: left; }")
         append("th { background-color: #E8EAF6; color: #1A237E; font-weight: bold; }")
@@ -718,20 +739,23 @@ private fun exportReportDashboard(
         append("<div class=\"kpi-card\"><div class=\"kpi-title\">NET MISMATCH</div><div class=\"kpi-value\" style=\"color:${if (totalMismatch < 0) "#C62828" else "#2E7D32"};\">${if (totalMismatch > 0) "+" else ""}₹ ${formatVal(totalMismatch)}</div></div>")
         append("</div>")
 
-        append("<div class=\"section-title\">1. Sales & Volume Breakdown</div>")
-        append("<table>")
-        append("<tr><th>Fuel Type</th><th>Volume Sold (L)</th><th>Volume %</th><th>Revenue (Rs)</th><th>Revenue %</th></tr>")
-        append("<tr><td>Petrol</td><td>${formatVal(totalPetrolLitre)} L</td><td>$pVolPct %</td><td>₹ ${formatVal(totalPetrolRev)}</td><td>$pRevPct %</td></tr>")
-        append("<tr><td>Diesel</td><td>${formatVal(totalDieselLitre)} L</td><td>$dVolPct %</td><td>₹ ${formatVal(totalDieselRev)}</td><td>$dRevPct %</td></tr>")
-        append("</table>")
+        append("<div class=\"section-title\">1. Sales Revenue Breakdown (₹)</div>")
+        append("<div class=\"chart-box\">$revPieSvg")
+        append("<div><p style=\"color:#FF9800; font-weight:bold;\">● Petrol: ₹ ${formatVal(totalPetrolRev)} (${String.format(Locale.US, "%.2f", pRevPct)}%)</p>")
+        append("<p style=\"color:#29B6F6; font-weight:bold;\">● Diesel: ₹ ${formatVal(totalDieselRev)} (${String.format(Locale.US, "%.2f", dRevPct)}%)</p></div></div>")
 
-        append("<div class=\"section-title\">2. Payment Method Distribution</div>")
+        append("<div class=\"section-title\">2. Volume Sold Breakdown (Litres)</div>")
+        append("<div class=\"chart-box\">$volPieSvg")
+        append("<div><p style=\"color:#FF9800; font-weight:bold;\">● Petrol: ${formatVal(totalPetrolLitre)} L (${String.format(Locale.US, "%.2f", pVolPct)}%)</p>")
+        append("<p style=\"color:#29B6F6; font-weight:bold;\">● Diesel: ${formatVal(totalDieselLitre)} L (${String.format(Locale.US, "%.2f", dVolPct)}%)</p></div></div>")
+
+        append("<div class=\"section-title\">3. Payment Method Distribution</div>")
         append("<table>")
         append("<tr><th>Cash Collected</th><th>Digital UPI Collected</th><th>Credit Issued (Lend)</th></tr>")
         append("<tr><td>₹ ${formatVal(totalCash)}</td><td>₹ ${formatVal(totalDigital)}</td><td>₹ ${formatVal(totalCreditIssued)}</td></tr>")
         append("</table>")
 
-        append("<div class=\"section-title\">3. Tank Stock & Variation Summary</div>")
+        append("<div class=\"section-title\">4. Tank Stock & Variation Summary</div>")
         append("<table>")
         append("<tr><th>Fuel Type</th><th>Refill Added (L)</th><th>Net Variation (L)</th></tr>")
         append("<tr><td>Petrol</td><td>${formatVal(totalPetrolRefill)} L</td><td>${formatVal(totalPetrolVariation)} L</td></tr>")
@@ -742,19 +766,40 @@ private fun exportReportDashboard(
         append("</div></body></html>")
     }
 
-    try {
-        val file = File(context.cacheDir, "NHFuel_Report_${fileTimestamp}.$ext")
-        file.writeText(htmlContent.toString(), Charsets.UTF_8)
+    if (format == ReportExportFormat.XLS) {
+        try {
+            val file = File(context.cacheDir, "NHFuel_Report_${fileTimestamp}.xls")
+            file.writeText(htmlContent.toString(), Charsets.UTF_8)
 
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = mime
-            putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Station Executive Report")
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/vnd.ms-excel"
+                putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Station Executive Report")
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Excel Report"))
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Executive Report"))
-    } catch (e: Exception) {
-        e.printStackTrace()
+    } else {
+        // Native PDF Printing via PrintManager
+        try {
+            val webView = WebView(context).apply {
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+                        val printAdapter = view?.createPrintDocumentAdapter("NHFuel_Report_$fileTimestamp")
+                        val jobName = "NH Fuel Report $periodDescription"
+                        if (printAdapter != null) {
+                            printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+                        }
+                    }
+                }
+            }
+            webView.loadDataWithBaseURL(null, htmlContent.toString(), "text/html", "UTF-8", null)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
