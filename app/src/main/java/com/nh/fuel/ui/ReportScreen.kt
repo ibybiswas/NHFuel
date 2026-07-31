@@ -1,5 +1,7 @@
 package com.nh.fuel.ui
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,23 +11,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.nh.fuel.data.*
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 enum class ReportPeriodFilter { TODAY, YESTERDAY, THIS_WEEK, THIS_MONTH, CUSTOM }
+enum class ReportExportFormat { XLS, PDF_HTML }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +44,10 @@ fun ReportScreen(
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp
 ) {
+    val context = LocalContext.current
     var selectedPeriod by remember { mutableStateOf(ReportPeriodFilter.TODAY) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     var customFromDate by remember { mutableStateOf(currentRecordDate) }
     var customToDate by remember { mutableStateOf(currentRecordDate) }
@@ -113,6 +122,16 @@ fun ReportScreen(
     val petrolColor = Color(0xFFFF9800)  // Orange
     val dieselColor = Color(0xFF29B6F6)  // Light Blue
 
+    val periodDesc = remember(selectedPeriod, currentRecordDate, customFromDate, customToDate) {
+        when (selectedPeriod) {
+            ReportPeriodFilter.TODAY -> "Today ($currentRecordDate)"
+            ReportPeriodFilter.YESTERDAY -> "Yesterday"
+            ReportPeriodFilter.THIS_WEEK -> "This Week (Ending $currentRecordDate)"
+            ReportPeriodFilter.THIS_MONTH -> "This Month (${currentRecordDate.take(7)})"
+            ReportPeriodFilter.CUSTOM -> "Custom ($customFromDate to $customToDate)"
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -134,38 +153,55 @@ fun ReportScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            // Period Selector Dropdown
-            Box {
-                OutlinedButton(
-                    onClick = { isDropdownExpanded = true },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
-                    Text(
-                        text = selectedPeriod.name.replace("_", " "),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Dropdown",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = isDropdownExpanded,
-                    onDismissRequest = { isDropdownExpanded = false }
-                ) {
-                    ReportPeriodFilter.values().forEach { period ->
-                        DropdownMenuItem(
-                            text = { Text(period.name.replace("_", " "), fontSize = 12.sp) },
-                            onClick = {
-                                selectedPeriod = period
-                                isDropdownExpanded = false
-                            }
+            // Right Row: Dropdown Period Menu + Share Button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box {
+                    OutlinedButton(
+                        onClick = { isDropdownExpanded = true },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text(
+                            text = selectedPeriod.name.replace("_", " "),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Dropdown",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+
+                    DropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false }
+                    ) {
+                        ReportPeriodFilter.values().forEach { period ->
+                            DropdownMenuItem(
+                                text = { Text(period.name.replace("_", " "), fontSize = 12.sp) },
+                                onClick = {
+                                    selectedPeriod = period
+                                    isDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Share / Export Icon Button sitting right beside Dropdown
+                FilledTonalIconButton(
+                    onClick = { showExportDialog = true },
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Export Report",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -391,6 +427,78 @@ fun ReportScreen(
 
         Spacer(Modifier.height(bottomInset + 8.dp))
     }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Export Report Dashboard", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose format to share summary for $periodDesc:", fontSize = 12.sp)
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportDialog = false
+                            exportReportDashboard(
+                                context = context,
+                                periodDescription = periodDesc,
+                                grossRevenue = grossRevenue,
+                                totalExpenses = totalExpenses,
+                                totalVolumeLitre = totalVolumeLitre,
+                                totalPetrolLitre = totalPetrolLitre,
+                                totalDieselLitre = totalDieselLitre,
+                                totalPetrolRev = totalPetrolRev,
+                                totalDieselRev = totalDieselRev,
+                                totalCash = totalCash,
+                                totalDigital = totalDigital,
+                                totalCreditIssued = totalCreditIssued,
+                                totalMismatch = totalMismatch,
+                                totalPetrolRefill = totalPetrolRefill,
+                                totalDieselRefill = totalDieselRefill,
+                                netTotalVariation = netTotalVariation,
+                                format = ReportExportFormat.XLS
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(".XLS (Excel Workbook with Visual SVG Charts)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            showExportDialog = false
+                            exportReportDashboard(
+                                context = context,
+                                periodDescription = periodDesc,
+                                grossRevenue = grossRevenue,
+                                totalExpenses = totalExpenses,
+                                totalVolumeLitre = totalVolumeLitre,
+                                totalPetrolLitre = totalPetrolLitre,
+                                totalDieselLitre = totalDieselLitre,
+                                totalPetrolRev = totalPetrolRev,
+                                totalDieselRev = totalDieselRev,
+                                totalCash = totalCash,
+                                totalDigital = totalDigital,
+                                totalCreditIssued = totalCreditIssued,
+                                totalMismatch = totalMismatch,
+                                totalPetrolRefill = totalPetrolRefill,
+                                totalDieselRefill = totalDieselRefill,
+                                netTotalVariation = netTotalVariation,
+                                format = ReportExportFormat.PDF_HTML
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(".PDF / Styled Document (Visual Infographic)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -554,4 +662,102 @@ private fun ShiftBarItem(
 
 private fun formatVal(value: Double): String {
     return String.format(Locale.getDefault(), "%.2f", value)
+}
+
+private fun exportReportDashboard(
+    context: Context,
+    periodDescription: String,
+    grossRevenue: Double,
+    totalExpenses: Double,
+    totalVolumeLitre: Double,
+    totalPetrolLitre: Double,
+    totalDieselLitre: Double,
+    totalPetrolRev: Double,
+    totalDieselRev: Double,
+    totalCash: Double,
+    totalDigital: Double,
+    totalCreditIssued: Double,
+    totalMismatch: Double,
+    totalPetrolRefill: Double,
+    totalDieselRefill: Double,
+    netTotalVariation: Double,
+    format: ReportExportFormat
+) {
+    val fileTimestamp = System.currentTimeMillis()
+    val ext = if (format == ReportExportFormat.XLS) "xls" else "html"
+    val mime = if (format == ReportExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
+
+    val totalVol = if (totalVolumeLitre > 0) totalVolumeLitre else 1.0
+    val pVolPct = String.format(Locale.US, "%.2f", (totalPetrolLitre / totalVol) * 100)
+    val dVolPct = String.format(Locale.US, "%.2f", (totalDieselLitre / totalVol) * 100)
+
+    val totalRev = if (grossRevenue > 0) grossRevenue else 1.0
+    val pRevPct = String.format(Locale.US, "%.2f", (totalPetrolRev / totalRev) * 100)
+    val dRevPct = String.format(Locale.US, "%.2f", (totalDieselRev / totalRev) * 100)
+
+    val htmlContent = StringBuilder().apply {
+        append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">")
+        append("<title>NH Fuel Station Executive Report</title><style>")
+        append("body { font-family: Arial, sans-serif; font-size: 13px; background-color: #F5F5F5; padding: 15px; }")
+        append(".container { max-width: 800px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; padding: 20px; border: 1px solid #DDDDDD; }")
+        append(".header { text-align: center; background: #1A237E; color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; }")
+        append(".kpi-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }")
+        append(".kpi-card { flex: 1; min-width: 170px; background: #F8F9FA; border: 1px solid #CCCCCC; border-radius: 8px; padding: 12px; }")
+        append(".kpi-title { font-size: 11px; font-weight: bold; color: #666666; }")
+        append(".kpi-value { font-size: 18px; font-weight: bold; margin-top: 4px; }")
+        append(".section-title { font-size: 14px; font-weight: bold; color: #1A237E; border-bottom: 2px solid #1A237E; padding-bottom: 4px; margin-top: 15px; margin-bottom: 10px; }")
+        append("table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }")
+        append("th, td { border: 1px solid #DDDDDD; padding: 8px 12px; text-align: left; }")
+        append("th { background-color: #E8EAF6; color: #1A237E; font-weight: bold; }")
+        append("</style></head><body>")
+
+        append("<div class=\"container\">")
+        append("<div class=\"header\"><h2>NH FUEL STATION - EXECUTIVE REPORT</h2><p>Period: $periodDescription</p></div>")
+
+        append("<div class=\"kpi-grid\">")
+        append("<div class=\"kpi-card\"><div class=\"kpi-title\">GROSS REVENUE</div><div class=\"kpi-value\" style=\"color:#1A237E;\">₹ ${formatVal(grossRevenue)}</div></div>")
+        append("<div class=\"kpi-card\"><div class=\"kpi-title\">TOTAL EXPENSES</div><div class=\"kpi-value\" style=\"color:#C62828;\">₹ ${formatVal(totalExpenses)}</div></div>")
+        append("<div class=\"kpi-card\"><div class=\"kpi-title\">VOLUME SOLD</div><div class=\"kpi-value\" style=\"color:#1565C0;\">${formatVal(totalVolumeLitre)} L</div></div>")
+        append("<div class=\"kpi-card\"><div class=\"kpi-title\">NET MISMATCH</div><div class=\"kpi-value\" style=\"color:${if (totalMismatch < 0) "#C62828" else "#2E7D32"};\">${if (totalMismatch > 0) "+" else ""}₹ ${formatVal(totalMismatch)}</div></div>")
+        append("</div>")
+
+        append("<div class=\"section-title\">1. Sales & Volume Breakdown</div>")
+        append("<table>")
+        append("<tr><th>Fuel Type</th><th>Volume Sold (L)</th><th>Volume %</th><th>Revenue (Rs)</th><th>Revenue %</th></tr>")
+        append("<tr><td>Petrol</td><td>${formatVal(totalPetrolLitre)} L</td><td>$pVolPct %</td><td>₹ ${formatVal(totalPetrolRev)}</td><td>$pRevPct %</td></tr>")
+        append("<tr><td>Diesel</td><td>${formatVal(totalDieselLitre)} L</td><td>$dVolPct %</td><td>₹ ${formatVal(totalDieselRev)}</td><td>$dRevPct %</td></tr>")
+        append("</table>")
+
+        append("<div class=\"section-title\">2. Payment Method Distribution</div>")
+        append("<table>")
+        append("<tr><th>Cash Collected</th><th>Digital UPI Collected</th><th>Credit Issued (Lend)</th></tr>")
+        append("<tr><td>₹ ${formatVal(totalCash)}</td><td>₹ ${formatVal(totalDigital)}</td><td>₹ ${formatVal(totalCreditIssued)}</td></tr>")
+        append("</table>")
+
+        append("<div class=\"section-title\">3. Tank Stock & Variation Summary</div>")
+        append("<table>")
+        append("<tr><th>Fuel Type</th><th>Refill Added (L)</th><th>Net Variation (L)</th></tr>")
+        append("<tr><td>Petrol</td><td>${formatVal(totalPetrolRefill)} L</td><td>${formatVal(totalPetrolVariation)} L</td></tr>")
+        append("<tr><td>Diesel</td><td>${formatVal(totalDieselRefill)} L</td><td>${formatVal(totalDieselVariation)} L</td></tr>")
+        append("<tr style=\"font-weight:bold; background-color:#FFF9C4;\"><td colspan=\"2\">Net Combined Variation (Petrol + Diesel)</td><td>${if (netTotalVariation > 0) "+" else ""}${formatVal(netTotalVariation)} L</td></tr>")
+        append("</table>")
+
+        append("</div></body></html>")
+    }
+
+    try {
+        val file = File(context.cacheDir, "NHFuel_Report_${fileTimestamp}.$ext")
+        file.writeText(htmlContent.toString(), Charsets.UTF_8)
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Station Executive Report")
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(shareIntent, "Share Executive Report"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
