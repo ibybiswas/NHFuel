@@ -3,14 +3,12 @@ package com.nh.fuel.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -230,7 +228,7 @@ fun ReportScreen(
             )
         }
 
-        // Pie Chart 1: Revenue Breakdown (₹)
+        // Pie Chart 1: Revenue Breakdown (₹) with 2 decimal precision
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -253,7 +251,7 @@ fun ReportScreen(
             }
         }
 
-        // Pie Chart 2: Volume Sold Breakdown (L)
+        // Pie Chart 2: Volume Sold Breakdown (L) with 2 decimal precision
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -273,6 +271,32 @@ fun ReportScreen(
                     dieselColor = dieselColor,
                     unitSuffix = "L"
                 )
+            }
+        }
+
+        // Shift-by-Shift Performance Breakdown
+        if (filteredRecords.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Shift-by-Shift Performance Breakdown",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    val s1Rev = filteredRecords.sumOf { it.shift1.getRevenue(it.petrolPrice, it.dieselPrice) }
+                    val s2Rev = filteredRecords.sumOf { it.shift2.getRevenue(it.petrolPrice, it.dieselPrice) }
+                    val s3Rev = filteredRecords.sumOf { it.shift3.getRevenue(it.petrolPrice, it.dieselPrice) }
+                    val maxShiftRev = maxOf(s1Rev, s2Rev, s3Rev, 1.0)
+
+                    ShiftBarItem("Shift 1", s1Rev, maxShiftRev, Color(0xFF7E57C2))
+                    ShiftBarItem("Shift 2", s2Rev, maxShiftRev, Color(0xFF26A69A))
+                    ShiftBarItem("Shift 3", s3Rev, maxShiftRev, Color(0xFFFFA726))
+                }
             }
         }
 
@@ -382,8 +406,8 @@ private fun FuelPieChart(
     val petrolSweep = if (total > 0) ((petrolValue / total) * 360f).toFloat() else 180f
     val dieselSweep = if (total > 0) ((dieselValue / total) * 360f).toFloat() else 180f
 
-    val petrolPct = if (total > 0) (petrolValue / total * 100).toInt() else 50
-    val dieselPct = if (total > 0) (dieselValue / total * 100).toInt() else 50
+    val petrolPct = if (total > 0) String.format(Locale.getDefault(), "%.2f", petrolValue / total * 100) else "50.00"
+    val dieselPct = if (total > 0) String.format(Locale.getDefault(), "%.2f", dieselValue / total * 100) else "50.00"
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -391,14 +415,12 @@ private fun FuelPieChart(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         Canvas(modifier = Modifier.size(130.dp)) {
-            // Draw Petrol Arc
             drawArc(
                 color = petrolColor,
                 startAngle = -90f,
                 sweepAngle = petrolSweep,
                 useCenter = true
             )
-            // Draw Diesel Arc
             drawArc(
                 color = dieselColor,
                 startAngle = -90f + petrolSweep,
@@ -491,6 +513,42 @@ private fun LegendItem(label: String, value: String, color: Color) {
             Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
         }
+    }
+}
+
+@Composable
+private fun ShiftBarItem(
+    shiftName: String,
+    revenue: Double,
+    maxRevenue: Double,
+    barColor: Color
+) {
+    val fraction = if (maxRevenue > 0) (revenue / maxRevenue).toFloat().coerceIn(0.05f, 1f) else 0.05f
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(shiftName, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp))
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(16.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(barColor)
+            )
+        }
+
+        Text("₹ ${formatVal(revenue)}", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(64.dp))
     }
 }
 
