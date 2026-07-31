@@ -64,108 +64,59 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme(colorScheme = colorScheme) {
                 val coroutineScope = rememberCoroutineScope()
-                var currentDate by remember {
-                    mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
-                }
-
-                val recordFlow = database.fuelDao().getRecordByDate(currentDate).collectAsState(initial = null)
-                val dbRecord = recordFlow.value
 
                 val allRecordsFlow = database.fuelDao().getAllRecords().collectAsState(initial = emptyList())
                 val allRecords = allRecordsFlow.value
 
-                // Dynamic carry-forward logic for unfinalized/unfinished previous days
-                val currentRecord = remember(dbRecord, currentDate, allRecords) {
+                // Anchor active business date to the latest unfinalized record or current calendar date
+                var activeBusinessDate by remember(allRecords) {
+                    mutableStateOf(
+                        allRecords.find { !it.shift3.isComplete }?.date
+                            ?: allRecords.maxByOrNull { it.date }?.date
+                            ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    )
+                }
+
+                val recordFlow = database.fuelDao().getRecordByDate(activeBusinessDate).collectAsState(initial = null)
+                val dbRecord = recordFlow.value
+
+                // Active business record state management
+                val currentRecord = remember(dbRecord, activeBusinessDate, allRecords) {
                     if (dbRecord != null) {
                         dbRecord
                     } else {
                         val previousRecord = allRecords
-                            .filter { it.date < currentDate }
+                            .filter { it.date < activeBusinessDate }
                             .maxByOrNull { it.date }
 
-                        val newRec = if (previousRecord != null) {
-                            fun getLatestClose(
-                                s3Close: Double,
-                                s2Close: Double,
-                                s1Close: Double,
-                                s1Open: Double
-                            ): Double {
+                        if (previousRecord != null) {
+                            fun getLatestClose(s3: Double, s2: Double, s1: Double, s1Open: Double): Double {
                                 return when {
-                                    s3Close > 0.0 -> s3Close
-                                    s2Close > 0.0 -> s2Close
-                                    s1Close > 0.0 -> s1Close
+                                    s3 > 0.0 -> s3
+                                    s2 > 0.0 -> s2
+                                    s1 > 0.0 -> s1
                                     else -> s1Open
                                 }
                             }
 
-                            val p1Mpd1N2 = getLatestClose(
-                                previousRecord.shift3.mpd1.petrolN2.close,
-                                previousRecord.shift2.mpd1.petrolN2.close,
-                                previousRecord.shift1.mpd1.petrolN2.close,
-                                previousRecord.shift1.mpd1.petrolN2.open
-                            )
-                            val p1Mpd1N3 = getLatestClose(
-                                previousRecord.shift3.mpd1.petrolN3.close,
-                                previousRecord.shift2.mpd1.petrolN3.close,
-                                previousRecord.shift1.mpd1.petrolN3.close,
-                                previousRecord.shift1.mpd1.petrolN3.open
-                            )
-                            val d1Mpd1N1 = getLatestClose(
-                                previousRecord.shift3.mpd1.dieselN1.close,
-                                previousRecord.shift2.mpd1.dieselN1.close,
-                                previousRecord.shift1.mpd1.dieselN1.close,
-                                previousRecord.shift1.mpd1.dieselN1.open
-                            )
-                            val d1Mpd1N4 = getLatestClose(
-                                previousRecord.shift3.mpd1.dieselN4.close,
-                                previousRecord.shift2.mpd1.dieselN4.close,
-                                previousRecord.shift1.mpd1.dieselN4.close,
-                                previousRecord.shift1.mpd1.dieselN4.open
-                            )
-
-                            val p1Mpd2N2 = getLatestClose(
-                                previousRecord.shift3.mpd2.petrolN2.close,
-                                previousRecord.shift2.mpd2.petrolN2.close,
-                                previousRecord.shift1.mpd2.petrolN2.close,
-                                previousRecord.shift1.mpd2.petrolN2.open
-                            )
-                            val p1Mpd2N3 = getLatestClose(
-                                previousRecord.shift3.mpd2.petrolN3.close,
-                                previousRecord.shift2.mpd2.petrolN3.close,
-                                previousRecord.shift1.mpd2.petrolN3.close,
-                                previousRecord.shift1.mpd2.petrolN3.open
-                            )
-                            val d1Mpd2N1 = getLatestClose(
-                                previousRecord.shift3.mpd2.dieselN1.close,
-                                previousRecord.shift2.mpd2.dieselN1.close,
-                                previousRecord.shift1.mpd2.dieselN1.close,
-                                previousRecord.shift1.mpd2.dieselN1.open
-                            )
-                            val d1Mpd2N4 = getLatestClose(
-                                previousRecord.shift3.mpd2.dieselN4.close,
-                                previousRecord.shift2.mpd2.dieselN4.close,
-                                previousRecord.shift1.mpd2.dieselN4.close,
-                                previousRecord.shift1.mpd2.dieselN4.open
-                            )
-
                             val carriedShift1 = DayShift(
                                 shiftNumber = 1,
                                 mpd1 = DispenserShift(
-                                    petrolN2 = NozzleShift(open = p1Mpd1N2),
-                                    petrolN3 = NozzleShift(open = p1Mpd1N3),
-                                    dieselN1 = NozzleShift(open = d1Mpd1N1),
-                                    dieselN4 = NozzleShift(open = d1Mpd1N4)
+                                    petrolN2 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd1.petrolN2.close, previousRecord.shift2.mpd1.petrolN2.close, previousRecord.shift1.mpd1.petrolN2.close, previousRecord.shift1.mpd1.petrolN2.open)),
+                                    petrolN3 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd1.petrolN3.close, previousRecord.shift2.mpd1.petrolN3.close, previousRecord.shift1.mpd1.petrolN3.close, previousRecord.shift1.mpd1.petrolN3.open)),
+                                    dieselN1 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd1.dieselN1.close, previousRecord.shift2.mpd1.dieselN1.close, previousRecord.shift1.mpd1.dieselN1.close, previousRecord.shift1.mpd1.dieselN1.open)),
+                                    dieselN4 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd1.dieselN4.close, previousRecord.shift2.mpd1.dieselN4.close, previousRecord.shift1.mpd1.dieselN4.close, previousRecord.shift1.mpd1.dieselN4.open))
                                 ),
                                 mpd2 = DispenserShift(
-                                    petrolN2 = NozzleShift(open = p1Mpd2N2),
-                                    petrolN3 = NozzleShift(open = p1Mpd2N3),
-                                    dieselN1 = NozzleShift(open = d1Mpd2N1),
-                                    dieselN4 = NozzleShift(open = d1Mpd2N4)
+                                    petrolN2 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd2.petrolN2.close, previousRecord.shift2.mpd2.petrolN2.close, previousRecord.shift1.mpd2.petrolN2.close, previousRecord.shift1.mpd2.petrolN2.open)),
+                                    petrolN3 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd2.petrolN3.close, previousRecord.shift2.mpd2.petrolN3.close, previousRecord.shift1.mpd2.petrolN3.close, previousRecord.shift1.mpd2.petrolN3.open)),
+                                    dieselN1 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd2.dieselN1.close, previousRecord.shift2.mpd2.dieselN1.close, previousRecord.shift1.mpd2.dieselN1.close, previousRecord.shift1.mpd2.dieselN1.open)),
+                                    dieselN4 = NozzleShift(open = getLatestClose(previousRecord.shift3.mpd2.dieselN4.close, previousRecord.shift2.mpd2.dieselN4.close, previousRecord.shift1.mpd2.dieselN4.close, previousRecord.shift1.mpd2.dieselN4.open))
                                 )
                             )
 
                             DailyFuelRecord(
-                                date = currentDate,
+                                date = activeBusinessDate,
                                 petrolTotal = previousRecord.currentPetrolStorage,
                                 petrolRefill = previousRecord.petrolRefill,
                                 petrolVariation = previousRecord.petrolVariation,
@@ -187,14 +138,8 @@ class MainActivity : ComponentActivity() {
                                 shift1 = carriedShift1
                             )
                         } else {
-                            DailyFuelRecord(date = currentDate)
+                            DailyFuelRecord(date = activeBusinessDate)
                         }
-
-                        // Auto-persist initial carry-forward record to DB immediately
-                        coroutineScope.launch {
-                            database.fuelDao().insertOrUpdate(newRec)
-                        }
-                        newRec
                     }
                 }
 
@@ -221,7 +166,7 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onDateSelected = { selectedDate ->
-                        currentDate = selectedDate
+                        activeBusinessDate = selectedDate
                     },
                     onOpacityChanged = { newOpacity ->
                         coroutineScope.launch {
