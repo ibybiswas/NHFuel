@@ -68,13 +68,24 @@ class MainActivity : ComponentActivity() {
                 val allRecordsFlow = database.fuelDao().getAllRecords().collectAsState(initial = emptyList())
                 val allRecords = allRecordsFlow.value
 
-                // Anchor active business date to the latest unfinalized record or current calendar date
-                var activeBusinessDate by remember(allRecords) {
+                // Default active date to today or latest existing record
+                var activeBusinessDate by remember {
                     mutableStateOf(
-                        allRecords.find { !it.shift3.isComplete }?.date
-                            ?: allRecords.maxByOrNull { it.date }?.date
-                            ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     )
+                }
+
+                // Keep activeBusinessDate anchored on existing unfinalized record if present
+                LaunchedEffect(allRecords) {
+                    if (allRecords.isNotEmpty()) {
+                        val unfinalizedRecord = allRecords.sortedBy { it.date }.find { !it.shift3.isComplete }
+                        if (unfinalizedRecord != null) {
+                            activeBusinessDate = unfinalizedRecord.date
+                        } else if (allRecords.none { it.date == activeBusinessDate }) {
+                            val maxDate = allRecords.maxByOrNull { it.date }?.date
+                            if (maxDate != null) activeBusinessDate = maxDate
+                        }
+                    }
                 }
 
                 val recordFlow = database.fuelDao().getRecordByDate(activeBusinessDate).collectAsState(initial = null)
