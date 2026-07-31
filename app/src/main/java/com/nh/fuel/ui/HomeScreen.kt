@@ -77,45 +77,52 @@ fun MainContainerScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (selectedMainTab) {
-                0 -> HomeScreenContent(
-                    record = record,
-                    onRecordChanged = onRecordChanged,
-                    onDateSelected = onDateSelected,
-                    topInset = topInset,
-                    bottomInset = bottomInset
-                )
-                1 -> SalesScreen(
-                    currentRecord = record,
-                    allRecords = allRecords,
-                    allExpenses = allExpenses,
-                    onRecordChanged = onRecordChanged,
-                    onDateSelected = onDateSelected,
-                    topInset = topInset,
-                    bottomInset = bottomInset
-                )
-                2 -> PlaceholderTab("Reports & Analytics")
-                3 -> FinanceScreen(
-    currentRecordDate = record.date,
-    allExpenses = allExpenses,
-    allCredits = allCredits,
-    allRecords = allRecords,
-    onAddOrUpdateExpense = onAddOrUpdateExpense,
-    onDeleteExpense = onDeleteExpense,
-    onAddOrUpdateCredit = onAddOrUpdateCredit,
-    onDeleteCredit = onDeleteCredit,
-    onDateSelected = onDateSelected,
-    topInset = topInset,
-    bottomInset = bottomInset
-)
-                4 -> SettingsScreen(
-                    currentOpacity = navBarOpacity,
-                    currentThemeMode = themeMode,
-                    onOpacityChanged = onOpacityChanged,
-                    onThemeModeChanged = onThemeModeChanged,
-                    topInset = topInset,
-                    bottomInset = bottomInset
-                )
-            }
+    0 -> HomeScreenContent(
+        record = record,
+        onRecordChanged = onRecordChanged,
+        onDateSelected = onDateSelected,
+        topInset = topInset,
+        bottomInset = bottomInset
+    )
+    1 -> SalesScreen(
+        currentRecord = record,
+        allRecords = allRecords,
+        allExpenses = allExpenses,
+        onRecordChanged = onRecordChanged,
+        onDateSelected = onDateSelected,
+        topInset = topInset,
+        bottomInset = bottomInset
+    )
+    2 -> ReportScreen(
+        currentRecordDate = record.date,
+        allRecords = allRecords,
+        allExpenses = allExpenses,
+        allCredits = allCredits,
+        topInset = topInset,
+        bottomInset = bottomInset
+    )
+    3 -> FinanceScreen(
+        currentRecordDate = record.date,
+        allExpenses = allExpenses,
+        allCredits = allCredits,
+        allRecords = allRecords,
+        onAddOrUpdateExpense = onAddOrUpdateExpense,
+        onDeleteExpense = onDeleteExpense,
+        onAddOrUpdateCredit = onAddOrUpdateCredit,
+        onDeleteCredit = onDeleteCredit,
+        onDateSelected = onDateSelected,
+        topInset = topInset,
+        bottomInset = bottomInset
+    )
+    4 -> SettingsScreen(
+        currentOpacity = navBarOpacity,
+        currentThemeMode = themeMode,
+        onOpacityChanged = onOpacityChanged,
+        onThemeModeChanged = onThemeModeChanged,
+        topInset = topInset,
+        bottomInset = bottomInset
+    )
+}
         }
 
         Box(
