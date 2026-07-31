@@ -2,6 +2,10 @@ package com.nh.fuel.ui
 
 import android.content.Context
 import android.content.Intent
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -37,7 +41,7 @@ import java.util.Date
 import java.util.Locale
 
 enum class PeriodFilter { DAY, WEEK, MONTH, YEAR, CUSTOM }
-enum class ExportFormat { XLS, CSV, PDF_DOC }
+enum class ExportFormat { XLS, CSV, PDF }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -479,11 +483,11 @@ fun SalesScreen(
                     OutlinedButton(
                         onClick = {
                             showExportFormatDialog = false
-                            exportSalesRecord(context, filteredRecords, allExpenses, periodDesc, ExportFormat.PDF_DOC)
+                            exportSalesRecord(context, filteredRecords, allExpenses, periodDesc, ExportFormat.PDF)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(".PDF / Styled Document (Print Ready)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(".PDF (Native Printable Document)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             },
@@ -757,23 +761,31 @@ private fun exportSalesRecord(
                 }
             }
 
-            shareExportedFile(
-                context = context,
-                fileContent = csvBuilder.toString(),
-                fileName = "NHFuel_Sales_Report_$fileTimestamp.csv",
-                mimeType = "text/csv"
-            )
+            try {
+                val file = File(context.cacheDir, "NHFuel_Sales_Report_$fileTimestamp.csv")
+                file.writeText(csvBuilder.toString(), Charsets.UTF_8)
+
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Sales Report")
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Share Sales CSV"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
-        ExportFormat.XLS, ExportFormat.PDF_DOC -> {
+        ExportFormat.XLS, ExportFormat.PDF -> {
             val totalColumns = 21
-            val ext = if (format == ExportFormat.XLS) "xls" else "html"
-            val mime = if (format == ExportFormat.XLS) "application/vnd.ms-excel" else "text/html"
 
             val htmlContent = StringBuilder().apply {
                 append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">")
                 append("<title>NH Fuel Station Sales Report</title><style>")
-                append("table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; width: 100%; }")
+                append("body { font-family: Arial, sans-serif; font-size: 11px; background-color: #FFFFFF; padding: 10px; }")
+                append("table { border-collapse: collapse; width: 100%; }")
                 append("th, td { border: 1px solid #444444; padding: 6px 8px; text-align: left; }")
                 append(".report-title { background-color: #1A237E; color: #FFFFFF; font-size: 16px; font-weight: bold; text-align: center; }")
                 append(".period-title { background-color: #E8EAF6; color: #1A237E; font-size: 12px; font-weight: bold; text-align: center; }")
@@ -871,30 +883,42 @@ private fun exportSalesRecord(
                 append("</table></body></html>")
             }
 
-            shareExportedFile(
-                context = context,
-                fileContent = htmlContent.toString(),
-                fileName = "NHFuel_Sales_Report_${fileTimestamp}.$ext",
-                mimeType = mime
-            )
-        }
-    }
-}
+            if (format == ExportFormat.XLS) {
+                try {
+                    val file = File(context.cacheDir, "NHFuel_Sales_Report_${fileTimestamp}.xls")
+                    file.writeText(htmlContent.toString(), Charsets.UTF_8)
 
-private fun shareExportedFile(context: Context, fileContent: String, fileName: String, mimeType: String) {
-    try {
-        val file = File(context.cacheDir, fileName)
-        file.writeText(fileContent, Charsets.UTF_8)
-
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = mimeType
-            putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Sales Report")
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/vnd.ms-excel"
+                        putExtra(Intent.EXTRA_SUBJECT, "NH Fuel Sales Report")
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Excel Sales Report"))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            } else {
+                // Native PDF Printing via PrintManager
+                try {
+                    val webView = WebView(context).apply {
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+                                val printAdapter = view?.createPrintDocumentAdapter("NHFuel_Sales_Report_$fileTimestamp")
+                                val jobName = "NH Fuel Sales Report $periodDescription"
+                                if (printAdapter != null) {
+                                    printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+                                }
+                            }
+                        }
+                    }
+                    webView.loadDataWithBaseURL(null, htmlContent.toString(), "text/html", "UTF-8", null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Sales Report"))
-    } catch (e: Exception) {
-        e.printStackTrace()
     }
 }
