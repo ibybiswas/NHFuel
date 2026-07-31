@@ -153,7 +153,6 @@ fun ReportScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            // Right Row: Dropdown Period Menu + Share Button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -192,7 +191,6 @@ fun ReportScreen(
                     }
                 }
 
-                // Share / Export Icon Button sitting right beside Dropdown
                 FilledTonalIconButton(
                     onClick = { showExportDialog = true },
                     modifier = Modifier.size(34.dp)
@@ -228,7 +226,6 @@ fun ReportScreen(
             }
         }
 
-        // Top KPI Cards: Gross Revenue (Left) & Total Expenses (Right)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MetricCard(
                 title = "Gross Revenue",
@@ -246,7 +243,6 @@ fun ReportScreen(
             )
         }
 
-        // Volume Sold & Net Mismatch
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MetricCard(
                 title = "Total Volume Sold",
@@ -264,7 +260,6 @@ fun ReportScreen(
             )
         }
 
-        // Pie Chart 1: Revenue Breakdown (₹) with 2 decimal precision
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -287,7 +282,6 @@ fun ReportScreen(
             }
         }
 
-        // Pie Chart 2: Volume Sold Breakdown (L) with 2 decimal precision
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -310,7 +304,6 @@ fun ReportScreen(
             }
         }
 
-        // Shift-by-Shift Performance Breakdown
         if (filteredRecords.isNotEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -336,7 +329,6 @@ fun ReportScreen(
             }
         }
 
-        // Payment Collections Breakdown Segment Bar
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -366,7 +358,6 @@ fun ReportScreen(
             }
         }
 
-        // Tank Refill & Variation Metrics
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -455,6 +446,8 @@ fun ReportScreen(
                                 totalMismatch = totalMismatch,
                                 totalPetrolRefill = totalPetrolRefill,
                                 totalDieselRefill = totalDieselRefill,
+                                totalPetrolVariation = totalPetrolVariation,
+                                totalDieselVariation = totalDieselVariation,
                                 netTotalVariation = netTotalVariation,
                                 format = ReportExportFormat.XLS
                             )
@@ -483,6 +476,8 @@ fun ReportScreen(
                                 totalMismatch = totalMismatch,
                                 totalPetrolRefill = totalPetrolRefill,
                                 totalDieselRefill = totalDieselRefill,
+                                totalPetrolVariation = totalPetrolVariation,
+                                totalDieselVariation = totalDieselVariation,
                                 netTotalVariation = netTotalVariation,
                                 format = ReportExportFormat.PDF_HTML
                             )
@@ -680,6 +675,8 @@ private fun exportReportDashboard(
     totalMismatch: Double,
     totalPetrolRefill: Double,
     totalDieselRefill: Double,
+    totalPetrolVariation: Double,
+    totalDieselVariation: Double,
     netTotalVariation: Double,
     format: ReportExportFormat
 ) {
