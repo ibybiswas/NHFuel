@@ -41,6 +41,16 @@ import java.util.Locale
 
 enum class ExpensePeriodFilter { ALL_TIME, THIS_MONTH, THIS_YEAR, CUSTOM }
 
+data class InternalLogEntry(
+    val id: String,
+    val typeLabel: String,
+    val isPayment: Boolean,
+    val date: String,
+    val timestamp: String,
+    val amount: Double,
+    val paymentMode: String
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanceScreen(
@@ -918,7 +928,61 @@ private fun CustomerLedgerDetailScreen(
     var showRecordPaymentDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditCustomerDialog by remember { mutableStateOf(false) }
-    var editingTransaction by remember { mutableStateOf<CreditTransaction?>(null) }
+    var editingLogEntry by remember { mutableStateOf<InternalLogEntry?>(null) }
+
+    // Parse text log into structured UI items for table display
+    val parsedLogs = remember(customer.notes, customer.date, customer.totalAmountDue, customer.amountPaid) {
+        val list = mutableListOf<InternalLogEntry>()
+        if (customer.notes.isNotBlank()) {
+            val lines = customer.notes.split("\n")
+            lines.forEachIndexed { index, line ->
+                val trimmed = line.trim().removePrefix("•").trim()
+                if (trimmed.isNotBlank()) {
+                    val isPayment = trimmed.contains("Settlement Received", ignoreCase = true)
+                    val label = if (isPayment) "Settlement Received" else "New Due Added"
+                    val isCash = trimmed.contains("Cash", ignoreCase = true)
+                    val isUpi = trimmed.contains("Digital", ignoreCase = true) || trimmed.contains("UPI", ignoreCase = true)
+                    val mode = if (isCash) "Cash" else if (isUpi) "Digital (UPI)" else if (isPayment) "Cash / UPI" else "(Due)"
+
+                    val amountRegex = Regex("₹\\s*([0-9]+\\.?[0-9]*)")
+                    val parsedAmt = amountRegex.find(trimmed)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+
+                    val dateRegex = Regex("([0-9]{4}-[0-9]{2}-[0-9]{2})")
+                    val dateMatch = dateRegex.find(trimmed)?.value ?: customer.date
+
+                    val timeRegex = Regex("([0-9]{2}:[0-9]{2}\\s*[a|p]m)", RegexOption.IGNORE_CASE)
+                    val timeMatch = timeRegex.find(trimmed)?.value ?: ""
+
+                    list.add(
+                        InternalLogEntry(
+                            id = "log_$index",
+                            typeLabel = label,
+                            isPayment = isPayment,
+                            date = dateMatch,
+                            timestamp = "$dateMatch ${if (timeMatch.isNotBlank()) timeMatch else "12:00 pm"}",
+                            amount = parsedAmt,
+                            paymentMode = mode
+                        )
+                    )
+                }
+            }
+        }
+        
+        if (list.isEmpty()) {
+            list.add(
+                InternalLogEntry(
+                    id = "init_0",
+                    typeLabel = "Initial Credit Issued",
+                    isPayment = false,
+                    date = customer.date,
+                    timestamp = "${customer.date} 09:00 am",
+                    amount = customer.totalAmountDue,
+                    paymentMode = "(Due)"
+                )
+            )
+        }
+        list
+    }
 
     Column(
         modifier = Modifier
@@ -1121,7 +1185,7 @@ private fun CustomerLedgerDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
                 ) {
-                    items(customer.transactions.reversed()) { tx ->
+                    items(parsedLogs, key = { it.id }) { log ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1131,12 +1195,12 @@ private fun CustomerLedgerDetailScreen(
                             // 1. Entry Type Pill
                             Box(modifier = Modifier.weight(1.3f)) {
                                 Surface(
-                                    color = if (tx.isPayment) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                    color = if (log.isPayment) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
                                     shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(
-                                        text = if (tx.isPayment) "Settlement Received" else "New Due Added",
-                                        color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                        text = log.typeLabel,
+                                        color = if (log.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828),
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -1146,14 +1210,14 @@ private fun CustomerLedgerDetailScreen(
 
                             // 2. Date
                             Text(
-                                text = tx.date,
+                                text = log.date,
                                 fontSize = 9.sp,
                                 modifier = Modifier.weight(1f)
                             )
 
                             // 3. Timestamp
                             Text(
-                                text = "${tx.date} ${tx.time}",
+                                text = log.timestamp,
                                 fontSize = 8.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1.2f)
@@ -1162,13 +1226,13 @@ private fun CustomerLedgerDetailScreen(
                             // 4. Amount & Type
                             Column(modifier = Modifier.weight(1.3f)) {
                                 Text(
-                                    text = "₹ ${String.format(Locale.getDefault(), "%.0f", tx.amount)}",
+                                    text = "₹ ${String.format(Locale.getDefault(), "%.0f", log.amount)}",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                    color = if (log.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828)
                                 )
                                 Text(
-                                    text = if (tx.isPayment) tx.note.ifBlank { "Cash / UPI" } else "(Due)",
+                                    text = log.paymentMode,
                                     fontSize = 8.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1181,7 +1245,7 @@ private fun CustomerLedgerDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IconButton(
-                                    onClick = { editingTransaction = tx },
+                                    onClick = { editingLogEntry = log },
                                     modifier = Modifier.size(22.dp)
                                 ) {
                                     Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(13.dp))
@@ -1189,10 +1253,13 @@ private fun CustomerLedgerDetailScreen(
 
                                 IconButton(
                                     onClick = {
-                                        val updatedList = customer.transactions.filter { it.id != tx.id }
-                                        val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
-                                        val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
-                                        onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                                        val newLogList = parsedLogs.filter { it.id != log.id }
+                                        val recomputedNotes = newLogList.joinToString("\n") {
+                                            "• ${it.typeLabel}: ₹ ${it.amount} on ${it.date} @ ${it.timestamp} (${it.paymentMode})"
+                                        }
+                                        val newPaid = newLogList.filter { it.isPayment }.sumOf { it.amount }
+                                        val newTotalDue = newLogList.filter { !it.isPayment }.sumOf { it.amount }
+                                        onUpdateCustomer(customer.copy(notes = recomputedNotes, amountPaid = newPaid, totalAmountDue = newTotalDue))
                                     },
                                     modifier = Modifier.size(22.dp)
                                 ) {
@@ -1232,17 +1299,22 @@ private fun CustomerLedgerDetailScreen(
         )
     }
 
-    if (editingTransaction != null) {
-        val tx = editingTransaction!!
-        EditIndividualTransactionModal(
-            transaction = tx,
-            onDismiss = { editingTransaction = null },
-            onSave = { updatedTx ->
-                val updatedList = customer.transactions.map { if (it.id == tx.id) updatedTx else it }
-                val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
-                val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
-                onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
-                editingTransaction = null
+    if (editingLogEntry != null) {
+        val entry = editingLogEntry!!
+        EditLogEntryModal(
+            entry = entry,
+            onDismiss = { editingLogEntry = null },
+            onSave = { updatedAmt, updatedDate, updatedNote ->
+                val updatedLogs = parsedLogs.map {
+                    if (it.id == entry.id) it.copy(amount = updatedAmt, date = updatedDate, paymentMode = updatedNote) else it
+                }
+                val recomputedNotes = updatedLogs.joinToString("\n") {
+                    "• ${it.typeLabel}: ₹ ${it.amount} on ${it.date} @ ${it.timestamp} (${it.paymentMode})"
+                }
+                val newPaid = updatedLogs.filter { it.isPayment }.sumOf { it.amount }
+                val newTotalDue = updatedLogs.filter { !it.isPayment }.sumOf { it.amount }
+                onUpdateCustomer(customer.copy(notes = recomputedNotes, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                editingLogEntry = null
             }
         )
     }
@@ -1277,18 +1349,18 @@ private fun CustomerLedgerDetailScreen(
 }
 
 @Composable
-private fun EditIndividualTransactionModal(
-    transaction: CreditTransaction,
+private fun EditLogEntryModal(
+    entry: InternalLogEntry,
     onDismiss: () -> Unit,
-    onSave: (CreditTransaction) -> Unit
+    onSave: (Double, String, String) -> Unit
 ) {
-    var amountText by remember { mutableStateOf(transaction.amount.toString()) }
-    var noteText by remember { mutableStateOf(transaction.note) }
-    var dateText by remember { mutableStateOf(transaction.date) }
+    var amountText by remember { mutableStateOf(entry.amount.toString()) }
+    var dateText by remember { mutableStateOf(entry.date) }
+    var noteText by remember { mutableStateOf(entry.paymentMode) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (transaction.isPayment) "Edit Settlement Payment" else "Edit Due Entry", fontWeight = FontWeight.Bold) },
+        title = { Text("Edit Log Entry", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -1311,7 +1383,7 @@ private fun EditIndividualTransactionModal(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = { Text("Note / Type (e.g. Digital (UPI), Cash)", fontSize = 9.sp) },
+                    label = { Text("Type / Description", fontSize = 9.sp) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1320,15 +1392,9 @@ private fun EditIndividualTransactionModal(
         confirmButton = {
             Button(
                 onClick = {
-                    val parsed = amountText.toDoubleOrNull() ?: transaction.amount
+                    val parsed = amountText.toDoubleOrNull() ?: entry.amount
                     if (parsed > 0.0) {
-                        onSave(
-                            transaction.copy(
-                                amount = parsed,
-                                date = dateText.trim(),
-                                note = noteText.trim()
-                            )
-                        )
+                        onSave(parsed, dateText.trim(), noteText.trim())
                     }
                 }
             ) { Text("Save Changes", fontWeight = FontWeight.Bold) }
@@ -1597,30 +1663,18 @@ private fun AddEditCreditDialog(
                         if (enteredDue > 0.0) {
                             val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                             val record = if (isAddingNewDue && initialCredit != null) {
-                                val newTx = CreditTransaction(
-                                    id = System.currentTimeMillis().toString(),
-                                    amount = enteredDue,
-                                    isPayment = false,
-                                    date = entryDate,
-                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
-                                    note = "(Due)"
-                                )
+                                val newNoteLog = buildString {
+                                    if (initialCredit.notes.isNotBlank()) append("${initialCredit.notes}\n")
+                                    append("• New Due Added: ₹ $enteredDue on $entryDate @ $nowStr")
+                                }
                                 initialCredit.copy(
                                     date = entryDate,
                                     petrolQuantityLitre = initialCredit.petrolQuantityLitre + (petrolLitreText.toDoubleOrNull() ?: 0.0),
                                     dieselQuantityLitre = initialCredit.dieselQuantityLitre + (dieselLitreText.toDoubleOrNull() ?: 0.0),
                                     totalAmountDue = initialCredit.totalAmountDue + enteredDue,
-                                    transactions = initialCredit.transactions + newTx
+                                    notes = newNoteLog
                                 )
                             } else {
-                                val initialTx = CreditTransaction(
-                                    id = System.currentTimeMillis().toString(),
-                                    amount = enteredDue,
-                                    isPayment = false,
-                                    date = entryDate,
-                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
-                                    note = "(Due)"
-                                )
                                 (initialCredit ?: CreditRecord(date = entryDate)).copy(
                                     date = entryDate,
                                     vehicleNumber = vehicleNo.trim(),
@@ -1629,8 +1683,7 @@ private fun AddEditCreditDialog(
                                     fuelType = selectedFuelType,
                                     petrolQuantityLitre = petrolLitreText.toDoubleOrNull() ?: 0.0,
                                     dieselQuantityLitre = dieselLitreText.toDoubleOrNull() ?: 0.0,
-                                    totalAmountDue = enteredDue,
-                                    transactions = listOf(initialTx)
+                                    totalAmountDue = enteredDue
                                 )
                             }
                             onSave(record)
@@ -1733,18 +1786,14 @@ private fun SettleCreditDialog(
                         val addedPayment = paymentAmountText.toDoubleOrNull() ?: 0.0
                         if (addedPayment > 0.0) {
                             val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                            val newTx = CreditTransaction(
-                                id = System.currentTimeMillis().toString(),
-                                amount = addedPayment,
-                                isPayment = true,
-                                date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
-                                time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
-                                note = selectedPaymentMode
-                            )
+                            val newNoteLog = buildString {
+                                if (credit.notes.isNotBlank()) append("${credit.notes}\n")
+                                append("• Settlement Received: ₹ $addedPayment @ $nowStr ($selectedPaymentMode)")
+                            }
                             val updated = credit.copy(
                                 amountPaid = credit.amountPaid + addedPayment,
                                 lastPaymentDate = nowStr,
-                                transactions = credit.transactions + newTx
+                                notes = newNoteLog
                             )
                             onConfirmSettlement(updated)
                         }
