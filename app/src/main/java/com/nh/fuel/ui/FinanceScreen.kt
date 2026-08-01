@@ -918,6 +918,7 @@ private fun CustomerLedgerDetailScreen(
     var showRecordPaymentDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditCustomerDialog by remember { mutableStateOf(false) }
+    var editingTransaction by remember { mutableStateOf<CreditTransaction?>(null) }
 
     Column(
         modifier = Modifier
@@ -1051,55 +1052,155 @@ private fun CustomerLedgerDetailScreen(
             }
         }
 
-        Text("Transaction & Settlement History Log:", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
+        // Clean Summary Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("• Initial Credit Issued on ${customer.date}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("- ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                }
 
+                if (customer.amountPaid > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("• Total Settlement Received", fontSize = 11.sp, color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                            if (customer.lastPaymentDate.isNotBlank()) {
+                                Text(customer.lastPaymentDate, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Text("+ ₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text("Detailed Log Entries", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+        // Structured Table View for Detailed Log Entries matching Reference Design
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
-            ) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("• Initial Credit Issued on ${customer.date}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        Text("- ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
-                    }
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Table Header Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Entry", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
+                    Text("Date", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("Timestamp", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.2f))
+                    Text("Amount & Type", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
+                    Text("Actions", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp))
                 }
 
-                if (customer.amountPaid > 0) {
-                    item {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Table Items List
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
+                ) {
+                    items(customer.transactions.reversed()) { tx ->
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "• Total Settlement Received ${if (customer.lastPaymentDate.isNotBlank()) "@ ${customer.lastPaymentDate}" else ""}",
-                                fontSize = 11.sp,
-                                color = Color(0xFF2E7D32),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text("+ ₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                        }
-                    }
-                }
+                            // 1. Entry Type Pill
+                            Box(modifier = Modifier.weight(1.3f)) {
+                                Surface(
+                                    color = if (tx.isPayment) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (tx.isPayment) "Settlement Received" else "New Due Added",
+                                        color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
 
-                if (customer.notes.isNotBlank()) {
-                    item {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                        Text("Detailed Log Entries:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(customer.notes, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // 2. Date
+                            Text(
+                                text = tx.date,
+                                fontSize = 9.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            // 3. Timestamp
+                            Text(
+                                text = "${tx.date} ${tx.time}",
+                                fontSize = 8.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1.2f)
+                            )
+
+                            // 4. Amount & Type
+                            Column(modifier = Modifier.weight(1.3f)) {
+                                Text(
+                                    text = "₹ ${String.format(Locale.getDefault(), "%.0f", tx.amount)}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                )
+                                Text(
+                                    text = if (tx.isPayment) tx.note.ifBlank { "Cash / UPI" } else "(Due)",
+                                    fontSize = 8.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // 5. Actions (Edit / Delete)
+                            Row(
+                                modifier = Modifier.width(52.dp),
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { editingTransaction = tx },
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(13.dp))
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        val updatedList = customer.transactions.filter { it.id != tx.id }
+                                        val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
+                                        val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
+                                        onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                                    },
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(13.dp))
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
             }
@@ -1131,6 +1232,21 @@ private fun CustomerLedgerDetailScreen(
         )
     }
 
+    if (editingTransaction != null) {
+        val tx = editingTransaction!!
+        EditIndividualTransactionModal(
+            transaction = tx,
+            onDismiss = { editingTransaction = null },
+            onSave = { updatedTx ->
+                val updatedList = customer.transactions.map { if (it.id == tx.id) updatedTx else it }
+                val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
+                val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
+                onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                editingTransaction = null
+            }
+        )
+    }
+
     if (showEditCustomerDialog) {
         EditCustomerInfoDialog(
             credit = customer,
@@ -1158,6 +1274,69 @@ private fun CustomerLedgerDetailScreen(
             }
         )
     }
+}
+
+@Composable
+private fun EditIndividualTransactionModal(
+    transaction: CreditTransaction,
+    onDismiss: () -> Unit,
+    onSave: (CreditTransaction) -> Unit
+) {
+    var amountText by remember { mutableStateOf(transaction.amount.toString()) }
+    var noteText by remember { mutableStateOf(transaction.note) }
+    var dateText by remember { mutableStateOf(transaction.date) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (transaction.isPayment) "Edit Settlement Payment" else "Edit Due Entry", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount (₹)", fontSize = 9.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (YYYY-MM-DD)", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text("Note / Type (e.g. Digital (UPI), Cash)", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = amountText.toDoubleOrNull() ?: transaction.amount
+                    if (parsed > 0.0) {
+                        onSave(
+                            transaction.copy(
+                                amount = parsed,
+                                date = dateText.trim(),
+                                note = noteText.trim()
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save Changes", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -1418,18 +1597,30 @@ private fun AddEditCreditDialog(
                         if (enteredDue > 0.0) {
                             val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                             val record = if (isAddingNewDue && initialCredit != null) {
-                                val newNoteLog = buildString {
-                                    if (initialCredit.notes.isNotBlank()) append("${initialCredit.notes}\n")
-                                    append("• New Due Added: ₹ $enteredDue on $entryDate @ $nowStr")
-                                }
+                                val newTx = CreditTransaction(
+                                    id = System.currentTimeMillis().toString(),
+                                    amount = enteredDue,
+                                    isPayment = false,
+                                    date = entryDate,
+                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
+                                    note = "(Due)"
+                                )
                                 initialCredit.copy(
                                     date = entryDate,
                                     petrolQuantityLitre = initialCredit.petrolQuantityLitre + (petrolLitreText.toDoubleOrNull() ?: 0.0),
                                     dieselQuantityLitre = initialCredit.dieselQuantityLitre + (dieselLitreText.toDoubleOrNull() ?: 0.0),
                                     totalAmountDue = initialCredit.totalAmountDue + enteredDue,
-                                    notes = newNoteLog
+                                    transactions = initialCredit.transactions + newTx
                                 )
                             } else {
+                                val initialTx = CreditTransaction(
+                                    id = System.currentTimeMillis().toString(),
+                                    amount = enteredDue,
+                                    isPayment = false,
+                                    date = entryDate,
+                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
+                                    note = "(Due)"
+                                )
                                 (initialCredit ?: CreditRecord(date = entryDate)).copy(
                                     date = entryDate,
                                     vehicleNumber = vehicleNo.trim(),
@@ -1438,7 +1629,8 @@ private fun AddEditCreditDialog(
                                     fuelType = selectedFuelType,
                                     petrolQuantityLitre = petrolLitreText.toDoubleOrNull() ?: 0.0,
                                     dieselQuantityLitre = dieselLitreText.toDoubleOrNull() ?: 0.0,
-                                    totalAmountDue = enteredDue
+                                    totalAmountDue = enteredDue,
+                                    transactions = listOf(initialTx)
                                 )
                             }
                             onSave(record)
@@ -1478,7 +1670,7 @@ private fun SettleCreditDialog(
     onConfirmSettlement: (CreditRecord) -> Unit
 ) {
     var paymentAmountText by remember { mutableStateOf("") }
-    var selectedPaymentMode by remember { mutableStateOf("Cash") } // Cash or Digital
+    var selectedPaymentMode by remember { mutableStateOf("Cash") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1541,14 +1733,18 @@ private fun SettleCreditDialog(
                         val addedPayment = paymentAmountText.toDoubleOrNull() ?: 0.0
                         if (addedPayment > 0.0) {
                             val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
-                            val newNoteLog = buildString {
-                                if (credit.notes.isNotBlank()) append("${credit.notes}\n")
-                                append("• Settlement Received: ₹ $addedPayment @ $nowStr ($selectedPaymentMode)")
-                            }
+                            val newTx = CreditTransaction(
+                                id = System.currentTimeMillis().toString(),
+                                amount = addedPayment,
+                                isPayment = true,
+                                date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                                time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
+                                note = selectedPaymentMode
+                            )
                             val updated = credit.copy(
                                 amountPaid = credit.amountPaid + addedPayment,
                                 lastPaymentDate = nowStr,
-                                notes = newNoteLog
+                                transactions = credit.transactions + newTx
                             )
                             onConfirmSettlement(updated)
                         }
