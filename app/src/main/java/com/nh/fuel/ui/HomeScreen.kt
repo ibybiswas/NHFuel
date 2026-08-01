@@ -463,8 +463,19 @@ fun HomeScreenContent(
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                    
+                    // Fixed: Only treat as absolute initial setup if starting stock was truly zero
+                    val isFirstEntry = record.petrolTotal == 0.0 && record.lastPetrolDipAmount == 0.0
 
-                    if (diff != 0.0) {
+                    if (isFirstEntry) {
+                        onRecordChanged(
+                            record.copy(
+                                petrolTotal = clampedVal,
+                                lastPetrolDipAmount = clampedVal,
+                                lastPetrolDipTime = nowStr
+                            )
+                        )
+                    } else if (diff != 0.0) {
                         val newVariation = record.petrolVariation + diff
                         val requiredTotal = clampedVal + record.totalPetrolSell - record.petrolRefill - newVariation
                         onRecordChanged(
@@ -538,8 +549,19 @@ fun HomeScreenContent(
                 onConfirmExactStock = { confirmedVal, diff ->
                     val clampedVal = max(0.0, confirmedVal)
                     val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                    
+                    // Fixed: Only treat as absolute initial setup if starting stock was truly zero
+                    val isFirstEntry = record.dieselTotal == 0.0 && record.lastDieselDipAmount == 0.0
 
-                    if (diff != 0.0) {
+                    if (isFirstEntry) {
+                        onRecordChanged(
+                            record.copy(
+                                dieselTotal = clampedVal,
+                                lastDieselDipAmount = clampedVal,
+                                lastDieselDipTime = nowStr
+                            )
+                        )
+                    } else if (diff != 0.0) {
                         val newVariation = record.dieselVariation + diff
                         val requiredTotal = clampedVal + record.totalDieselSell - record.dieselRefill - newVariation
                         onRecordChanged(
