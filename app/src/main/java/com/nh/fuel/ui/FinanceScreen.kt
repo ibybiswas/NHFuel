@@ -1,5 +1,9 @@
 package com.nh.fuel.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -13,12 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -49,58 +56,78 @@ fun FinanceScreen(
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp
 ) {
-    var selectedSubTab by remember { mutableStateOf(0) } // 0: Daily Expenses, 1: Credit / Lend Ledger
+    var selectedSubTab by remember { mutableStateOf(1) } // 0: Daily Expenses, 1: Credit / Lend Ledger
+    var selectedCustomerForDetail by remember { mutableStateOf<CreditRecord?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp)
-    ) {
-        Spacer(Modifier.height(topInset + 4.dp))
-
-        Text(
-            text = "Finance & Ledgers",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onBackground
+    if (selectedCustomerForDetail != null) {
+        val currentCustomer = allCredits.find { it.id == selectedCustomerForDetail?.id } ?: selectedCustomerForDetail!!
+        CustomerLedgerDetailScreen(
+            customer = currentCustomer,
+            onBack = { selectedCustomerForDetail = null },
+            onUpdateCustomer = { updated ->
+                onAddOrUpdateCredit(updated)
+                selectedCustomerForDetail = updated
+            },
+            onDeleteCustomer = {
+                onDeleteCredit(currentCustomer)
+                selectedCustomerForDetail = null
+            },
+            topInset = topInset,
+            bottomInset = bottomInset
         )
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp)
+        ) {
+            Spacer(Modifier.height(topInset + 4.dp))
 
-        Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Finance & Ledgers",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
-        TabRow(selectedTabIndex = selectedSubTab) {
-            Tab(
-                selected = selectedSubTab == 0,
-                onClick = { selectedSubTab = 0 },
-                text = { Text("Daily Expenses", fontWeight = FontWeight.Bold) },
-                icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp)) }
-            )
-            Tab(
-                selected = selectedSubTab == 1,
-                onClick = { selectedSubTab = 1 },
-                text = { Text("Credit / Lend Ledger", fontWeight = FontWeight.Bold) },
-                icon = { Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp)) }
-            )
-        }
+            Spacer(Modifier.height(8.dp))
 
-        Spacer(Modifier.height(8.dp))
+            TabRow(selectedTabIndex = selectedSubTab) {
+                Tab(
+                    selected = selectedSubTab == 0,
+                    onClick = { selectedSubTab = 0 },
+                    text = { Text("Daily Expenses", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+                Tab(
+                    selected = selectedSubTab == 1,
+                    onClick = { selectedSubTab = 1 },
+                    text = { Text("Credit / Lend Ledger", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+            }
 
-        when (selectedSubTab) {
-            0 -> ExpendScreenContent(
-                currentRecordDate = currentRecordDate,
-                allExpenses = allExpenses,
-                onAddOrUpdateExpense = onAddOrUpdateExpense,
-                onDeleteExpense = onDeleteExpense,
-                onDateSelected = onDateSelected,
-                bottomInset = bottomInset
-            )
-            1 -> CreditLedgerContent(
-                currentRecordDate = currentRecordDate,
-                allCredits = allCredits,
-                allRecords = allRecords,
-                onAddOrUpdateCredit = onAddOrUpdateCredit,
-                onDeleteCredit = onDeleteCredit,
-                bottomInset = bottomInset
-            )
+            Spacer(Modifier.height(8.dp))
+
+            when (selectedSubTab) {
+                0 -> ExpendScreenContent(
+                    currentRecordDate = currentRecordDate,
+                    allExpenses = allExpenses,
+                    onAddOrUpdateExpense = onAddOrUpdateExpense,
+                    onDeleteExpense = onDeleteExpense,
+                    onDateSelected = onDateSelected,
+                    bottomInset = bottomInset
+                )
+                1 -> CreditLedgerContent(
+                    currentRecordDate = currentRecordDate,
+                    allCredits = allCredits,
+                    allRecords = allRecords,
+                    onCustomerSelected = { selectedCustomerForDetail = it },
+                    onAddOrUpdateCredit = onAddOrUpdateCredit,
+                    onDeleteCredit = onDeleteCredit,
+                    bottomInset = bottomInset
+                )
+            }
         }
     }
 }
@@ -566,6 +593,7 @@ private fun CreditLedgerContent(
     currentRecordDate: String,
     allCredits: List<CreditRecord>,
     allRecords: List<DailyFuelRecord>,
+    onCustomerSelected: (CreditRecord) -> Unit,
     onAddOrUpdateCredit: (CreditRecord) -> Unit,
     onDeleteCredit: (CreditRecord) -> Unit,
     bottomInset: Dp
@@ -575,8 +603,6 @@ private fun CreditLedgerContent(
     var showAddCreditDialog by remember { mutableStateOf(false) }
     var prefilledCustomerCredit by remember { mutableStateOf<CreditRecord?>(null) }
     var isAddingNewDueToUser by remember { mutableStateOf(false) }
-    var editingCustomerInfoCredit by remember { mutableStateOf<CreditRecord?>(null) }
-    var creditToSettle by remember { mutableStateOf<CreditRecord?>(null) }
 
     val totalOutstanding = remember(allCredits) {
         allCredits.sumOf { it.remainingBalance }
@@ -678,18 +704,51 @@ private fun CreditLedgerContent(
             contentPadding = PaddingValues(bottom = bottomInset + 8.dp)
         ) {
             items(filteredCredits, key = { it.id }) { credit ->
-                CreditCardItem(
-                    credit = credit,
-                    onAddNewDue = {
-                        prefilledCustomerCredit = credit
-                        isAddingNewDueToUser = true
-                        showAddCreditDialog = true
-                    },
-                    onEditCustomerInfo = { editingCustomerInfoCredit = credit },
-                    onUpdateCredit = { updatedCredit -> onAddOrUpdateCredit(updatedCredit) },
-                    onSettle = { creditToSettle = credit },
-                    onDelete = { onDeleteCredit(credit) }
-                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onCustomerSelected(credit) }
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = if (credit.customerName.isNotBlank()) credit.customerName else "Customer (No Name)",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Vehicle: ${credit.vehicleNumber.ifBlank { "-" }} | Mob: ${credit.mobileNumber.ifBlank { "-" }}",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text("Date: ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            val statusColor = if (credit.remainingBalance <= 0.0) Color(0xFF2E7D32) else Color(0xFFFF9800)
+                            Text(
+                                text = if (credit.remainingBalance <= 0.0) "CLEARED" else "PARTIAL",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                            Text(
+                                text = "Due: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.remainingBalance)}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (credit.remainingBalance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -707,175 +766,210 @@ private fun CreditLedgerContent(
             }
         )
     }
-
-    editingCustomerInfoCredit?.let { credit ->
-        EditCustomerInfoDialog(
-            credit = credit,
-            onDismiss = { editingCustomerInfoCredit = null },
-            onSave = { updatedCredit ->
-                onAddOrUpdateCredit(updatedCredit)
-                editingCustomerInfoCredit = null
-            }
-        )
-    }
-
-    creditToSettle?.let { credit ->
-        SettleCreditDialog(
-            credit = credit,
-            onDismiss = { creditToSettle = null },
-            onConfirmSettlement = { updatedCredit ->
-                onAddOrUpdateCredit(updatedCredit)
-                creditToSettle = null
-            }
-        )
-    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreditCardItem(
-    credit: CreditRecord,
-    onAddNewDue: () -> Unit,
-    onEditCustomerInfo: () -> Unit,
-    onUpdateCredit: (CreditRecord) -> Unit,
-    onSettle: () -> Unit,
-    onDelete: () -> Unit
+private fun CustomerLedgerDetailScreen(
+    customer: CreditRecord,
+    onBack: () -> Unit,
+    onUpdateCustomer: (CreditRecord) -> Unit,
+    onDeleteCustomer: () -> Unit,
+    topInset: Dp,
+    bottomInset: Dp
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var showAddTransactionDialog by remember { mutableStateOf<Boolean?>(null) } // true: Payment, false: Due, null: hidden
+    var editingTransaction by remember { mutableStateOf<CreditTransaction?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showEditCustomerDialog by remember { mutableStateOf(false) }
 
-    val statusColor = when (credit.status) {
-        CreditStatus.PAID -> Color(0xFF2E7D32)
-        CreditStatus.PARTIAL -> Color(0xFFF57C00)
-        CreditStatus.UNPAID -> Color(0xFFC62828)
-    }
-
-    Card(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-            .clickable { isExpanded = !isExpanded },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (credit.customerName.isNotBlank()) credit.customerName else "Customer (No Name)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Vehicle: ${if (credit.vehicleNumber.isNotBlank()) credit.vehicleNumber else "-"} | Mob: ${if (credit.mobileNumber.isNotBlank()) credit.mobileNumber else "-"}",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+        Spacer(Modifier.height(topInset + 4.dp))
 
-                Surface(
-                    color = statusColor.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = credit.status.name,
-                        color = statusColor,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 9.sp,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+        // Top Navigation Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
+                Text("Customer Ledger", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // WhatsApp Reminder Button
+                IconButton(
+                    onClick = { sendWhatsAppReminder(context, customer) },
+                    enabled = customer.mobileNumber.isNotBlank()
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "WhatsApp",
+                        tint = if (customer.mobileNumber.isNotBlank()) Color(0xFF25D366) else Color.Gray
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Date: ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val fuelInfo = buildString {
-                        if (credit.petrolQuantityLitre > 0) append("Petrol: ${credit.petrolQuantityLitre}L ")
-                        if (credit.dieselQuantityLitre > 0) append("Diesel: ${credit.dieselQuantityLitre}L")
+                // SMS Reminder Button
+                IconButton(
+                    onClick = { sendSmsReminder(context, customer) },
+                    enabled = customer.mobileNumber.isNotBlank()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sms,
+                        contentDescription = "SMS",
+                        tint = if (customer.mobileNumber.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+
+                IconButton(onClick = { showEditCustomerDialog = true }) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Customer Info")
+                }
+
+                IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete Customer", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+
+        // Customer Info Summary Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(customer.customerName.ifBlank { "Customer (No Name)" }, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                    Text("Date: ${customer.date}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Vehicle: ${customer.vehicleNumber.ifBlank { "N/A" }}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Mobile: ${customer.mobileNumber.ifBlank { "N/A" }}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Total Credit", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
-                    if (fuelInfo.isNotBlank()) Text(fuelInfo, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Total Due: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.totalAmountDue)}", fontSize = 10.sp)
-                    Text("Paid: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.amountPaid)}", fontSize = 10.sp, color = Color(0xFF2E7D32))
-                    Text("Balance: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.remainingBalance)}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = statusColor)
-                }
-            }
+                    Column {
+                        Text("Total Paid", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    }
 
-            // Expanded Transaction & Settlement History Log with individual edit & delete options
-            AnimatedVisibility(visible = isExpanded) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-
-                    Text("Transaction & Settlement History Log:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-
-                    Text("• Initial Credit Issued: ₹ ${credit.totalAmountDue} on ${credit.date}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
-
-                    if (credit.amountPaid > 0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Balance Due", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = "• Total Settlement Received: ₹ ${credit.amountPaid} ${if (credit.lastPaymentDate.isNotBlank()) "@ ${credit.lastPaymentDate}" else ""}",
-                            fontSize = 10.sp,
-                            color = Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold
+                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)}",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (customer.remainingBalance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
                         )
                     }
-
-                    if (credit.notes.isNotBlank()) {
-                        Text("Detailed Log Entries:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(credit.notes, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // Action Buttons Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { showAddTransactionDialog = false }, // Add New Due
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                modifier = Modifier.weight(1f)
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete Credit Record", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = onEditCustomerInfo, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Customer Profile Info", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
-                    }
-                }
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("+ Add Due", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(
-                        onClick = onAddNewDue,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+            Button(
+                onClick = { showAddTransactionDialog = true }, // Record Settlement Payment
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Record Payment", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Text("Transaction & Settlement History:", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
+
+        // History Log List with Aligned Amounts on Right
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = bottomInset + 12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(customer.transactions.reversed()) { tx ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(2.dp))
-                        Text("+ Add New Due", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = if (tx.isPayment) "Settlement Payment Received" else tx.note.ifBlank { "New Due Added" },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${tx.date} @ ${tx.time}",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                    if (credit.remainingBalance > 0.0) {
-                        Button(
-                            onClick = onSettle,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("Record Payment", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "${if (tx.isPayment) "+" else "-"} ₹ ${String.format(Locale.getDefault(), "%.2f", tx.amount)}",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp,
+                                color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828)
+                            )
+
+                            IconButton(
+                                onClick = { editingTransaction = tx },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Transaction", modifier = Modifier.size(14.dp))
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    val updatedList = customer.transactions.filter { it.id != tx.id }
+                                    val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
+                                    val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
+                                    onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Transaction", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                            }
                         }
                     }
                 }
@@ -883,22 +977,137 @@ private fun CreditCardItem(
         }
     }
 
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Entire Customer Credit Record?", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to completely delete all credit logs and settlements for ${credit.customerName}?", fontSize = 12.sp) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirm = false
-                    onDelete()
-                }) { Text("Delete All", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+    if (showAddTransactionDialog != null) {
+        val isPayment = showAddTransactionDialog == true
+        AddTransactionModal(
+            isPayment = isPayment,
+            onDismiss = { showAddTransactionDialog = null },
+            onSave = { amount, note ->
+                val nowStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+
+                val newTx = CreditTransaction(
+                    id = System.currentTimeMillis().toString(),
+                    amount = amount,
+                    isPayment = isPayment,
+                    date = nowStr,
+                    time = timeStr,
+                    note = note
+                )
+
+                val updatedTxList = customer.transactions + newTx
+                val newPaid = if (isPayment) customer.amountPaid + amount else customer.amountPaid
+                val newTotalDue = if (!isPayment) customer.totalAmountDue + amount else customer.totalAmountDue
+
+                onUpdateCustomer(
+                    customer.copy(
+                        transactions = updatedTxList,
+                        amountPaid = newPaid,
+                        totalAmountDue = newTotalDue
+                    )
+                )
+                showAddTransactionDialog = null
             }
         )
     }
+
+    if (editingTransaction != null) {
+        val tx = editingTransaction!!
+        AddTransactionModal(
+            isPayment = tx.isPayment,
+            initialAmount = tx.amount,
+            initialNote = tx.note,
+            onDismiss = { editingTransaction = null },
+            onSave = { amount, note ->
+                val updatedList = customer.transactions.map {
+                    if (it.id == tx.id) it.copy(amount = amount, note = note) else it
+                }
+                val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
+                val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
+
+                onUpdateCustomer(customer.copy(transactions = updatedList, amountPaid = newPaid, totalAmountDue = newTotalDue))
+                editingTransaction = null
+            }
+        )
+    }
+
+    if (showEditCustomerDialog) {
+        EditCustomerInfoDialog(
+            credit = customer,
+            onDismiss = { showEditCustomerDialog = false },
+            onSave = { updatedCust ->
+                onUpdateCustomer(updatedCust)
+                showEditCustomerDialog = false
+            }
+        )
+    }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Delete Customer Record?", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete ${customer.customerName}? All transaction history will be permanently deleted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmDialog = false
+                    onDeleteCustomer()
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddTransactionModal(
+    isPayment: Boolean,
+    initialAmount: Double = 0.0,
+    initialNote: String = "",
+    onDismiss: () -> Unit,
+    onSave: (Double, String) -> Unit
+) {
+    var amountText by remember { mutableStateOf(if (initialAmount > 0) initialAmount.toString() else "") }
+    var noteText by remember { mutableStateOf(initialNote) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isPayment) "Record Payment Received" else "Add New Due", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount (₹)", fontSize = 9.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    label = { Text("Description / Notes (Optional)", fontSize = 9.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = amountText.toDoubleOrNull() ?: 0.0
+                    if (parsed > 0.0) {
+                        onSave(parsed, noteText)
+                    }
+                }
+            ) { Text("Save", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -1000,7 +1209,6 @@ private fun AddEditCreditDialog(
     var showEntryDatePicker by remember { mutableStateOf(false) }
     var isCalculatingInternal by remember { mutableStateOf(false) }
 
-    // Dynamic fuel rates lookup from allRecords for entryDate (fallback to latest recorded non-zero prices)
     val fuelRates = remember(entryDate, allRecords) {
         val exactRecord = allRecords.find { it.date == entryDate }
         val pPrice = exactRecord?.petrolPrice ?: 0.0
@@ -1279,5 +1487,59 @@ private fun SettleCreditDialog(
                 }
             }
         }
+    }
+}
+
+private fun sendWhatsAppReminder(context: Context, customer: CreditRecord) {
+    if (customer.mobileNumber.isBlank()) return
+
+    val cleanPhone = customer.mobileNumber.replace(Regex("[^0-9]"), "")
+    val formattedPhone = if (cleanPhone.length == 10) "91$cleanPhone" else cleanPhone
+
+    val message = """
+⛽ *NH FUEL STATION*
+--------------------------------
+Hello *${customer.customerName}*,
+
+This is a gentle reminder regarding your outstanding fuel credit balance.
+
+📋 *Customer Details:*
+• *Name:* ${customer.customerName}
+• *Vehicle No:* ${customer.vehicleNumber.ifBlank { "N/A" }}
+• *Total Credit Issued:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}
+• *Total Amount Paid:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}
+
+💰 *Current Net Balance Due: ₹ ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)}*
+
+Kindly arrange to clear the pending dues at your earliest convenience.
+
+Thank you!
+--------------------------------
+NH Fuel Station
+    """.trimIndent()
+
+    try {
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse("https://api.whatsapp.com/send?phone=$formattedPhone&text=${Uri.encode(message)}")
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "WhatsApp is not installed on this device.", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun sendSmsReminder(context: Context, customer: CreditRecord) {
+    if (customer.mobileNumber.isBlank()) return
+
+    val message = "NH Fuel Station Reminder: Dear ${customer.customerName}, your current fuel credit balance due is Rs. ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)} (Vehicle: ${customer.vehicleNumber.ifBlank { "N/A" }}). Kindly clear the pending dues. Thank you!"
+
+    try {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("smsto:${customer.mobileNumber}")
+            putExtra("sms_body", message)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Could not launch SMS app.", Toast.LENGTH_SHORT).show()
     }
 }
