@@ -605,10 +605,10 @@ private fun CreditLedgerContent(
     var isAddingNewDueToUser by remember { mutableStateOf(false) }
 
     val totalOutstanding = remember(allCredits) {
-        allCredits.sumOf { it.balance }
+        allCredits.sumOf { it.remainingBalance }
     }
     val givenToday = remember(allCredits, currentRecordDate) {
-        allCredits.filter { it.date == currentRecordDate }.sumOf { it.totalDue }
+        allCredits.filter { it.date == currentRecordDate }.sumOf { it.totalAmountDue }
     }
 
     val filteredCredits = remember(allCredits, searchQuery, selectedFilter) {
@@ -733,18 +733,18 @@ private fun CreditLedgerContent(
                         }
 
                         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            val statusColor = if (credit.balance <= 0.0) Color(0xFF2E7D32) else Color(0xFFFF9800)
+                            val statusColor = if (credit.remainingBalance <= 0.0) Color(0xFF2E7D32) else Color(0xFFFF9800)
                             Text(
-                                text = if (credit.balance <= 0.0) "CLEARED" else "PARTIAL",
+                                text = if (credit.remainingBalance <= 0.0) "CLEARED" else "PARTIAL",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = statusColor
                             )
                             Text(
-                                text = "Due: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.balance)}",
+                                text = "Due: ₹ ${String.format(Locale.getDefault(), "%.2f", credit.remainingBalance)}",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (credit.balance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
+                                color = if (credit.remainingBalance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
                             )
                         }
                     }
@@ -779,8 +779,8 @@ private fun CustomerLedgerDetailScreen(
     bottomInset: Dp
 ) {
     val context = LocalContext.current
-    var showAddTransactionDialog by remember { mutableStateOf<Boolean?>(null) } // true: Payment, false: Due, null: hidden
-    var editingTransaction by remember { mutableStateOf<CreditTransaction?>(null) }
+    var showAddTransactionModal by remember { mutableStateOf<Boolean?>(null) } // true: Payment, false: Due, null: hidden
+    var editingNoteText by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditCustomerDialog by remember { mutableStateOf(false) }
 
@@ -861,21 +861,21 @@ private fun CustomerLedgerDetailScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Total Credit", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalDue)}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Column {
                         Text("Total Paid", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.paidAmount)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                        Text("₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Balance Due", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", customer.balance)}",
+                            text = "₹ ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)}",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = if (customer.balance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
+                            color = if (customer.remainingBalance > 0) Color(0xFFC62828) else Color(0xFF2E7D32)
                         )
                     }
                 }
@@ -890,7 +890,7 @@ private fun CustomerLedgerDetailScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = { showAddTransactionDialog = false }, // Add New Due
+                onClick = { showAddTransactionModal = false }, // Add New Due
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
                 modifier = Modifier.weight(1f)
             ) {
@@ -900,7 +900,7 @@ private fun CustomerLedgerDetailScreen(
             }
 
             Button(
-                onClick = { showAddTransactionDialog = true }, // Record Settlement Payment
+                onClick = { showAddTransactionModal = true }, // Record Settlement Payment
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                 modifier = Modifier.weight(1f)
             ) {
@@ -910,123 +910,74 @@ private fun CustomerLedgerDetailScreen(
             }
         }
 
-        Text("Transaction & Settlement History:", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
+        Text("Transaction & Settlement History Log:", fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
 
-        // History Log List with Aligned Amounts on Right
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(bottom = bottomInset + 12.dp),
-            modifier = Modifier.fillMaxSize()
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            items(customer.transactions.reversed()) { tx ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = if (tx.isPayment) "Settlement Payment Received" else tx.note.ifBlank { "New Due Added" },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${tx.date} @ ${tx.time}",
-                                fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = bottomInset + 12.dp)
+            ) {
+                item {
+                    Text("• Initial Credit Issued: ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)} on ${customer.date}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
 
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "${if (tx.isPayment) "+" else "-"} ₹ ${String.format(Locale.getDefault(), "%.2f", tx.amount)}",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                                color = if (tx.isPayment) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
+                if (customer.amountPaid > 0) {
+                    item {
+                        Text(
+                            text = "• Total Settlement Received: ₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)} ${if (customer.lastPaymentDate.isNotBlank()) "@ ${customer.lastPaymentDate}" else ""}",
+                            fontSize = 11.sp,
+                            color = Color(0xFF2E7D32),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
-                            IconButton(
-                                onClick = { editingTransaction = tx },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Transaction", modifier = Modifier.size(14.dp))
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    val updatedList = customer.transactions.filter { it.id != tx.id }
-                                    val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
-                                    val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
-                                    onUpdateCustomer(customer.copy(transactions = updatedList, paidAmount = newPaid, totalDue = newTotalDue))
-                                },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete Transaction", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-                            }
-                        }
+                if (customer.notes.isNotBlank()) {
+                    item {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                        Text("Detailed Log Entries:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(customer.notes, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
     }
 
-    if (showAddTransactionDialog != null) {
-        val isPayment = showAddTransactionDialog == true
+    if (showAddTransactionModal != null) {
+        val isPayment = showAddTransactionModal == true
         AddTransactionModal(
             isPayment = isPayment,
-            onDismiss = { showAddTransactionDialog = null },
+            onDismiss = { showAddTransactionModal = null },
             onSave = { amount, note ->
-                val nowStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-
-                val newTx = CreditTransaction(
-                    id = System.currentTimeMillis().toString(),
-                    amount = amount,
-                    isPayment = isPayment,
-                    date = nowStr,
-                    time = timeStr,
-                    note = note
-                )
-
-                val updatedTxList = customer.transactions + newTx
-                val newPaid = if (isPayment) customer.paidAmount + amount else customer.paidAmount
-                val newTotalDue = if (!isPayment) customer.totalDue + amount else customer.totalDue
-
-                onUpdateCustomer(
-                    customer.copy(
-                        transactions = updatedTxList,
-                        paidAmount = newPaid,
-                        totalDue = newTotalDue
-                    )
-                )
-                showAddTransactionDialog = null
-            }
-        )
-    }
-
-    if (editingTransaction != null) {
-        val tx = editingTransaction!!
-        AddTransactionModal(
-            isPayment = tx.isPayment,
-            initialAmount = tx.amount,
-            initialNote = tx.note,
-            onDismiss = { editingTransaction = null },
-            onSave = { amount, note ->
-                val updatedList = customer.transactions.map {
-                    if (it.id == tx.id) it.copy(amount = amount, note = note) else it
+                val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+                val newNoteLog = buildString {
+                    if (customer.notes.isNotBlank()) append("${customer.notes}\n")
+                    append("• ${if (isPayment) "Settlement Received" else "New Due Added"}: ₹ $amount @ $nowStr ${if (note.isNotBlank()) "($note)" else ""}")
                 }
-                val newPaid = updatedList.filter { it.isPayment }.sumOf { it.amount }
-                val newTotalDue = updatedList.filter { !it.isPayment }.sumOf { it.amount }
 
-                onUpdateCustomer(customer.copy(transactions = updatedList, paidAmount = newPaid, totalDue = newTotalDue))
-                editingTransaction = null
+                val updated = if (isPayment) {
+                    customer.copy(
+                        amountPaid = customer.amountPaid + amount,
+                        lastPaymentDate = nowStr,
+                        notes = newNoteLog
+                    )
+                } else {
+                    customer.copy(
+                        totalAmountDue = customer.totalAmountDue + amount,
+                        notes = newNoteLog
+                    )
+                }
+
+                onUpdateCustomer(updated)
+                showAddTransactionModal = null
             }
         )
     }
@@ -1368,30 +1319,18 @@ private fun AddEditCreditDialog(
                         if (enteredDue > 0.0) {
                             val nowStr = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
                             val record = if (isAddingNewDue && initialCredit != null) {
-                                val newTx = CreditTransaction(
-                                    id = System.currentTimeMillis().toString(),
-                                    amount = enteredDue,
-                                    isPayment = false,
-                                    date = entryDate,
-                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
-                                    note = "New Due Added"
-                                )
+                                val newNoteLog = buildString {
+                                    if (initialCredit.notes.isNotBlank()) append("${initialCredit.notes}\n")
+                                    append("• New Due Added: ₹ $enteredDue on $entryDate @ $nowStr")
+                                }
                                 initialCredit.copy(
                                     date = entryDate,
                                     petrolQuantityLitre = initialCredit.petrolQuantityLitre + (petrolLitreText.toDoubleOrNull() ?: 0.0),
                                     dieselQuantityLitre = initialCredit.dieselQuantityLitre + (dieselLitreText.toDoubleOrNull() ?: 0.0),
-                                    totalDue = initialCredit.totalDue + enteredDue,
-                                    transactions = initialCredit.transactions + newTx
+                                    totalAmountDue = initialCredit.totalAmountDue + enteredDue,
+                                    notes = newNoteLog
                                 )
                             } else {
-                                val initialTx = CreditTransaction(
-                                    id = System.currentTimeMillis().toString(),
-                                    amount = enteredDue,
-                                    isPayment = false,
-                                    date = entryDate,
-                                    time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date()),
-                                    note = "Initial Credit Issued"
-                                )
                                 (initialCredit ?: CreditRecord(date = entryDate)).copy(
                                     date = entryDate,
                                     vehicleNumber = vehicleNo.trim(),
@@ -1400,8 +1339,7 @@ private fun AddEditCreditDialog(
                                     fuelType = selectedFuelType,
                                     petrolQuantityLitre = petrolLitreText.toDoubleOrNull() ?: 0.0,
                                     dieselQuantityLitre = dieselLitreText.toDoubleOrNull() ?: 0.0,
-                                    totalDue = enteredDue,
-                                    transactions = listOf(initialTx)
+                                    totalAmountDue = enteredDue
                                 )
                             }
                             onSave(record)
@@ -1450,10 +1388,10 @@ This is a gentle reminder regarding your outstanding fuel credit balance.
 📋 *Customer Details:*
 • *Name:* ${customer.customerName}
 • *Vehicle No:* ${customer.vehicleNumber.ifBlank { "N/A" }}
-• *Total Credit Issued:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalDue)}
-• *Total Amount Paid:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.paidAmount)}
+• *Total Credit Issued:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.totalAmountDue)}
+• *Total Amount Paid:* ₹ ${String.format(Locale.getDefault(), "%.2f", customer.amountPaid)}
 
-💰 *Current Net Balance Due: ₹ ${String.format(Locale.getDefault(), "%.2f", customer.balance)}*
+💰 *Current Net Balance Due: ₹ ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)}*
 
 Kindly arrange to clear the pending dues at your earliest convenience.
 
@@ -1475,7 +1413,7 @@ NH Fuel Station
 private fun sendSmsReminder(context: Context, customer: CreditRecord) {
     if (customer.mobileNumber.isBlank()) return
 
-    val message = "NH Fuel Station Reminder: Dear ${customer.customerName}, your current fuel credit balance due is Rs. ${String.format(Locale.getDefault(), "%.2f", customer.balance)} (Vehicle: ${customer.vehicleNumber.ifBlank { "N/A" }}). Kindly clear the pending dues. Thank you!"
+    val message = "NH Fuel Station Reminder: Dear ${customer.customerName}, your current fuel credit balance due is Rs. ${String.format(Locale.getDefault(), "%.2f", customer.remainingBalance)} (Vehicle: ${customer.vehicleNumber.ifBlank { "N/A" }}). Kindly clear the pending dues. Thank you!"
 
     try {
         val intent = Intent(Intent.ACTION_SENDTO).apply {
