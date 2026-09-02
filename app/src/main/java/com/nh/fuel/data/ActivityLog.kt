@@ -20,7 +20,22 @@ data class ActivityLogItem(
 }
 
 object ActivityLogger {
+    /**
+     * Master switch for Activity & Audit Logging. Defaults to OFF (disabled) and is kept in
+     * sync with the "Enable Activity & Audit Logging" toggle in Settings via [setEnabled].
+     * While disabled, [log] is a no-op — no entries are written to Firestore.
+     */
+    @Volatile
+    var isEnabled: Boolean = false
+        private set
+
+    fun setEnabled(enabled: Boolean) {
+        isEnabled = enabled
+    }
+
     fun log(session: AppUserSession, actionDetails: String) {
+        if (!isEnabled) return
+
         val db = FirebaseFirestore.getInstance()
         val now = System.currentTimeMillis()
         val formattedTime = SimpleDateFormat("MMM d, hh:mm a", Locale.US).format(Date(now))
