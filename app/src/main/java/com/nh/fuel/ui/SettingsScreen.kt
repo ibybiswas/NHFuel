@@ -102,6 +102,9 @@ fun SettingsScreen(
     allCredits: List<CreditRecord> = emptyList(),
     currentOpacity: Float,
     currentThemeMode: ThemeMode,
+    activityLogEnabled: Boolean = false,
+    onActivityLogEnabledChanged: (Boolean) -> Unit = {},
+    onDeleteDayData: (String) -> Unit = {},
     onOpacityChanged: (Float) -> Unit,
     onThemeModeChanged: (ThemeMode) -> Unit,
     onRecordChanged: (DailyFuelRecord) -> Unit = {},
@@ -114,6 +117,7 @@ fun SettingsScreen(
     var showMaintenancePage by remember { mutableStateOf(false) }
     var showActivityLogPage by remember { mutableStateOf(false) }
     var showLocalBackupPage by remember { mutableStateOf(false) }
+    var showDeleteDayDialog by remember { mutableStateOf(false) }
 
     val canAccessAdminPanel = session.isOwnerLogin || session.role == Role.SUPER_ADMIN || session.role == Role.ADMIN
     val isSuperAdmin = session.isOwnerLogin || session.role == Role.SUPER_ADMIN
@@ -270,23 +274,47 @@ fun SettingsScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-                            .clickable { showActivityLogPage = true },
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp)),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Column {
-                                    Text("Activity & Audit Logs", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text("View history of changes for the last 90 days", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column {
+                            // Enable/disable switch — OFF by default, no logs are recorded while disabled
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Column {
+                                        Text("Activity & Audit Logging", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(
+                                            if (activityLogEnabled) "Enabled — staff actions are being recorded" else "Disabled — no actions are being recorded",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
+                                Switch(
+                                    checked = activityLogEnabled,
+                                    onCheckedChange = onActivityLogEnabledChanged
+                                )
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                            // Tap to view whatever has been recorded so far (even if now disabled)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showActivityLogPage = true }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("View history of changes for the last 90 days", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -310,6 +338,32 @@ fun SettingsScreen(
                                 Column {
                                     Text("Super Admin Maintenance Mode", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer)
                                     Text("Reset hardware meter readings for pump recalibration", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+
+                // Super Admin — Delete a Business Day's Data (DANGER ZONE)
+                if (isSuperAdmin) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .clickable { showDeleteDayDialog = true },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Column {
+                                    Text("Delete a Business Day's Data", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                                    Text("Permanently wipe sales, expenses & credits for one date", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.error)
@@ -369,7 +423,100 @@ fun SettingsScreen(
                 }
             }
         }
+
+        if (showDeleteDayDialog && isSuperAdmin) {
+            DeleteDayDataDialog(
+                availableDates = allRecords.map { it.date }.distinct().sortedDescending(),
+                onDismiss = { showDeleteDayDialog = false },
+                onConfirmDelete = { targetDate ->
+                    showDeleteDayDialog = false
+                    onDeleteDayData(targetDate)
+                }
+            )
+        }
     }
+}
+
+// ============================================================================
+// SUPER ADMIN — DELETE A SINGLE BUSINESS DAY'S DATA (SALES + EXPENSES + CREDITS)
+// ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeleteDayDataDialog(
+    availableDates: List<String>,
+    onDismiss: () -> Unit,
+    onConfirmDelete: (String) -> Unit
+) {
+    var selectedDate by remember { mutableStateOf(availableDates.firstOrNull() ?: "") }
+    var dateMenuExpanded by remember { mutableStateOf(false) }
+    var confirmText by remember { mutableStateOf("") }
+
+    val isConfirmed = confirmText.trim().equals("DELETE", ignoreCase = false) && selectedDate.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Business Day Data", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.error) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "This permanently deletes the fuel/sales record, all expenses, and all credit ledger entries for the selected date. This cannot be undone.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (availableDates.isEmpty()) {
+                    Text("No records found.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    ExposedDropdownMenuBox(
+                        expanded = dateMenuExpanded,
+                        onExpandedChange = { dateMenuExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedDate,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Business Date", fontSize = 11.sp) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dateMenuExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = dateMenuExpanded,
+                            onDismissRequest = { dateMenuExpanded = false }
+                        ) {
+                            availableDates.forEach { date ->
+                                DropdownMenuItem(
+                                    text = { Text(date, fontSize = 12.sp) },
+                                    onClick = {
+                                        selectedDate = date
+                                        dateMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = confirmText,
+                        onValueChange = { confirmText = it },
+                        label = { Text("Type DELETE to confirm", fontSize = 11.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirmDelete(selectedDate) },
+                enabled = isConfirmed
+            ) {
+                Text("Delete Permanently", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 // ============================================================================
