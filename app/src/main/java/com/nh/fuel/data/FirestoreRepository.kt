@@ -47,6 +47,20 @@ class FirestoreRepository {
         }
     }
 
+    suspend fun deleteFuelRecord(date: String) {
+        if (date.isBlank()) return
+        suspendCancellableCoroutine<Unit> { cont ->
+            db.collection("daily_fuel_records")
+                .document(date)
+                .delete()
+                .addOnSuccessListener { if (cont.isActive) cont.resume(Unit) }
+                .addOnFailureListener { e ->
+                    Log.e("FirestoreRepository", "Failed to delete record: ${e.localizedMessage}")
+                    if (cont.isActive) cont.resumeWithException(e)
+                }
+        }
+    }
+
     // 2. Expenses
     fun observeAllExpenses(): Flow<List<ExpenseItem>> = callbackFlow {
         val listener = db.collection("expenses")
