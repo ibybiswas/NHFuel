@@ -1,6 +1,7 @@
 package com.nh.fuel.ui
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -18,11 +19,14 @@ class AppPreferences(private val context: Context) {
     companion object {
         val NAV_BAR_OPACITY_KEY = floatPreferencesKey("nav_bar_opacity")
         val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        val ACTIVITY_LOG_ENABLED_KEY = booleanPreferencesKey("activity_log_enabled")
         /** Opacity used the very first time the app runs, before any explicit choice is saved. */
         const val DEFAULT_GLASS_OPACITY = 0.55f
         /** The bar never goes fully invisible or fully opaque—both ends still read as "glass". */
         const val MIN_GLASS_OPACITY = 0.15f
         const val MAX_GLASS_OPACITY = 1f
+        /** Activity & Audit Logging is OFF by default until an admin explicitly enables it. */
+        const val DEFAULT_ACTIVITY_LOG_ENABLED = false
     }
 
     val opacityFlow: Flow<Float> = context.dataStore.data.map { preferences ->
@@ -38,6 +42,10 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    val activityLogEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ACTIVITY_LOG_ENABLED_KEY] ?: DEFAULT_ACTIVITY_LOG_ENABLED
+    }
+
     suspend fun saveOpacity(opacity: Float) {
         context.dataStore.edit { preferences ->
             preferences[NAV_BAR_OPACITY_KEY] = opacity.coerceIn(MIN_GLASS_OPACITY, MAX_GLASS_OPACITY)
@@ -47,6 +55,12 @@ class AppPreferences(private val context: Context) {
     suspend fun saveThemeMode(mode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[THEME_MODE_KEY] = mode.name
+        }
+    }
+
+    suspend fun saveActivityLogEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ACTIVITY_LOG_ENABLED_KEY] = enabled
         }
     }
 }
