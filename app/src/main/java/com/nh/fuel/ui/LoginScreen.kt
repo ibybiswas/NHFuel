@@ -307,40 +307,64 @@ private fun verifyAccessCode(
     onSuccess: (AppUserSession) -> Unit,
     onError: (String) -> Unit
 ) {
-    // Strip hyphens and non-alphanumeric characters
+    // Strip hyphens and non-alphanumeric characters. The clean code is the Firestore document ID.
     val cleanInputCode = code.replace(Regex("[^A-Za-z0-9]"), "").uppercase()
-    val db = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
 
-    db.collection("access_keys")
-        .get()
-        .addOnSuccessListener { query ->
-            var foundKey: StaffAccessKey? = null
-
-            for (doc in query.documents) {
-                val keyObj = doc.toObject(StaffAccessKey::class.java)
-                val rawDocCode = keyObj?.accessCode?.replace(Regex("[^A-Za-z0-9]"), "")?.uppercase() ?: ""
-                
-                if (rawDocCode == cleanInputCode) {
-                    foundKey = keyObj
-                    break
-                }
+    // Firestore rules require a signed-in user, so give this device an anonymous identity first.
+    if (auth.currentUser != null) {
+        lookupAccessKey(cleanInputCode, onSuccess, onError)
+    } else {
+        auth.signInAnonymously()
+            .addOnSuccessListener { lookupAccessKey(cleanInputCode, onSuccess, onError) }
+            .addOnFailureListener {
+                onError("Device sign-in failed: ${it.localizedMessage ?: "Unknown error"}")
             }
+    }
+}
 
-            if (foundKey != null) {
-                if (foundKey.status == KeyStatus.ACTIVE) {
-                    val session = AppUserSession(
-                        emailOrKey = foundKey.accessCode,
-                        displayName = foundKey.nickname,
-                        role = foundKey.role,
-                        canEditPastDates = foundKey.canEditPastDates,
-                        isOwnerLogin = false
-                    )
-                    onSuccess(session)
-                } else {
-                    onError("Access Denied: This key has been revoked by the Admin.")
-                }
-            } else {
+private fun lookupAccessKey(
+    cleanCode: String,
+    onSuccess: (AppUserSession) -> Unit,
+    onError: (String) -> Unit
+) {
+    val db = FirebaseFirestore.getInstance()
+    val uid = FirebaseAuth.getInstance().currentUser?.uid
+    if (uid == null) {
+        onError("Device sign-in failed. Please try again.")
+        return
+    }
+
+    // Single-document lookup (no listing of all keys)
+    db.collection("access_keys").document(cleanCode)
+        .get()
+        .addOnSuccessListener { doc ->
+            val foundKey = if (doc.exists()) doc.toObject(StaffAccessKey::class.java) else null
+
+            if (foundKey == null) {
                 onError("Invalid Key: Access key not found.")
+            } else if (foundKey.status != KeyStatus.ACTIVE) {
+                onError("Access Denied: This key has been revoked by the Admin.")
+            } else {
+                // Claim this key for this device so Firestore rules recognise the session
+                db.collection("staff_sessions").document(uid)
+                    .set(mapOf("code" to cleanCode, "createdAt" to System.currentTimeMillis()))
+                    .addOnSuccessListener {
+                        onSuccess(
+                            AppUserSession(
+                                emailOrKey = foundKey.accessCode,
+                                displayName = foundKey.nickname,
+                                role = foundKey.role,
+                                canEditPastDates = foundKey.canEditPastDates,
+                                canEditFinancePastDates = foundKey.canEditFinancePastDates,
+                                isReadOnly = foundKey.isReadOnly,
+                                isOwnerLogin = false
+                            )
+                        )
+                    }
+                    .addOnFailureListener {
+                        onError("Could not start session: ${it.localizedMessage ?: "Unknown error"}")
+                    }
             }
         }
         .addOnFailureListener {
