@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.nh.fuel.data.ActivityLogger
 import com.nh.fuel.data.AppUserSession
@@ -78,53 +79,106 @@ class MainActivity : ComponentActivity() {
                 var isCheckingSession by remember { mutableStateOf(true) }
 
                 LaunchedEffect(Unit) {
-                    currentSession = UserSessionManager.getSavedSession(context)
-                    isCheckingSession = false
+                    val saved = UserSessionManager.getSavedSession(context)
+                    val auth = FirebaseAuth.getInstance()
+                    val user = auth.currentUser
+
+                    if (saved == null) {
+                        currentSession = null
+                        isCheckingSession = false
+                        return@LaunchedEffect
+                    }
+
+                    if (saved.isOwnerLogin) {
+                        // Owner must still hold a real Google-backed Firebase login
+                        if (user == null || user.isAnonymous) {
+                            UserSessionManager.clearSession(context)
+                            currentSession = null
+                        } else {
+                            currentSession = saved
+                        }
+                        isCheckingSession = false
+                        return@LaunchedEffect
+                    }
+
+                    // Staff: make sure this device has a Firebase identity + key claim
+                    val code = saved.emailOrKey.replace(Regex("[^A-Za-z0-9]"), "").uppercase()
+                    fun claimAndFinish(uid: String?) {
+                        if (uid == null) {
+                            currentSession = saved
+                            isCheckingSession = false
+                            return
+                        }
+                        FirebaseFirestore.getInstance().collection("staff_sessions").document(uid)
+                            .set(mapOf("code" to code, "createdAt" to System.currentTimeMillis()))
+                            .addOnCompleteListener {
+                                currentSession = saved
+                                isCheckingSession = false
+                            }
+                    }
+
+                    if (user != null) {
+                        claimAndFinish(user.uid)
+                    } else {
+                        auth.signInAnonymously().addOnCompleteListener { task ->
+                            claimAndFinish(if (task.isSuccessful) task.result?.user?.uid else null)
+                        }
+                    }
+                }
+
+                // --- OWNER: migrate legacy access keys so their document ID equals the clean code ---
+                LaunchedEffect(currentSession?.isOwnerLogin) {
+                    if (currentSession?.isOwnerLogin == true) {
+                        migrateLegacyAccessKeys()
+                    }
                 }
 
                 // --- REAL-TIME ACCESS KEY & PRIVILEGE SYNCHRONIZER ---
-                LaunchedEffect(currentSession?.emailOrKey) {
-                    val session = currentSession ?: return@LaunchedEffect
-                    if (!session.isOwnerLogin) {
-                        val db = FirebaseFirestore.getInstance()
-                        val cleanCode = session.emailOrKey.replace(Regex("[^A-Za-z0-9]"), "").uppercase()
-                        db.collection("access_keys")
-                            .addSnapshotListener { snapshot, _ ->
-                                if (snapshot != null) {
-                                    val matchingDoc = snapshot.documents.find { doc ->
-                                        val keyObj = doc.toObject(StaffAccessKey::class.java)
-                                        keyObj?.accessCode?.replace(Regex("[^A-Za-z0-9]"), "")?.uppercase() == cleanCode
-                                    }
-                                    val keyObj = matchingDoc?.toObject(StaffAccessKey::class.java)
+                DisposableEffect(currentSession?.emailOrKey, currentSession?.isOwnerLogin) {
+                    val session = currentSession
+                    var registration: com.google.firebase.firestore.ListenerRegistration? = null
 
-                                    if (matchingDoc == null || keyObj?.status != KeyStatus.ACTIVE) {
+                    if (session != null && !session.isOwnerLogin) {
+                        val cleanCode = session.emailOrKey.replace(Regex("[^A-Za-z0-9]"), "").uppercase()
+                        registration = FirebaseFirestore.getInstance()
+                            .collection("access_keys").document(cleanCode)
+                            .addSnapshotListener { doc, error ->
+                                if (error != null || doc == null) return@addSnapshotListener
+                                // Offline with nothing cached: don't treat it as "key deleted"
+                                if (!doc.exists() && doc.metadata.isFromCache) return@addSnapshotListener
+
+                                val keyObj = if (doc.exists()) doc.toObject(StaffAccessKey::class.java) else null
+
+                                if (keyObj == null || keyObj.status != KeyStatus.ACTIVE) {
+                                    coroutineScope.launch {
+                                        UserSessionManager.clearSession(context)
+                                        currentSession = null
+                                        endFirebaseSession()
+                                    }
+                                } else {
+                                    val updatedSession = session.copy(
+                                        canEditPastDates = keyObj.canEditPastDates,
+                                        canEditFinancePastDates = keyObj.canEditFinancePastDates,
+                                        role = keyObj.role,
+                                        isReadOnly = keyObj.isReadOnly,
+                                        displayName = keyObj.nickname
+                                    )
+                                    if (updatedSession.isReadOnly != currentSession?.isReadOnly ||
+                                        updatedSession.canEditPastDates != currentSession?.canEditPastDates ||
+                                        updatedSession.canEditFinancePastDates != currentSession?.canEditFinancePastDates ||
+                                        updatedSession.role != currentSession?.role ||
+                                        updatedSession.displayName != currentSession?.displayName
+                                    ) {
+                                        currentSession = updatedSession
                                         coroutineScope.launch {
-                                            UserSessionManager.clearSession(context)
-                                            currentSession = null
-                                        }
-                                    } else {
-                                        val updatedSession = session.copy(
-                                            canEditPastDates = keyObj.canEditPastDates,
-                                            canEditFinancePastDates = keyObj.canEditFinancePastDates,
-                                            role = keyObj.role,
-                                            isReadOnly = keyObj.isReadOnly,
-                                            displayName = keyObj.nickname
-                                        )
-                                        if (updatedSession.isReadOnly != currentSession?.isReadOnly ||
-                                            updatedSession.canEditPastDates != currentSession?.canEditPastDates ||
-                                            updatedSession.canEditFinancePastDates != currentSession?.canEditFinancePastDates ||
-                                            updatedSession.role != currentSession?.role ||
-                                            updatedSession.displayName != currentSession?.displayName
-                                        ) {
-                                            currentSession = updatedSession
-                                            coroutineScope.launch {
-                                                UserSessionManager.saveSession(context, updatedSession)
-                                            }
+                                            UserSessionManager.saveSession(context, updatedSession)
                                         }
                                     }
                                 }
                             }
                     }
+
+                    onDispose { registration?.remove() }
                 }
 
                 if (isCheckingSession) {
@@ -358,10 +412,41 @@ class MainActivity : ComponentActivity() {
                             coroutineScope.launch {
                                 UserSessionManager.clearSession(context)
                                 currentSession = null
+                                endFirebaseSession()
                             }
                         }
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Removes this device's key claim (staff) and signs out of Firebase (staff and owner). */
+private fun endFirebaseSession() {
+    val auth = FirebaseAuth.getInstance()
+    val user = auth.currentUser
+    if (user != null && user.isAnonymous) {
+        FirebaseFirestore.getInstance().collection("staff_sessions").document(user.uid)
+            .delete()
+            .addOnCompleteListener { auth.signOut() }
+    } else {
+        auth.signOut()
+    }
+}
+
+/** One-time owner-side fix: legacy keys used timestamp IDs; rules need ID == clean access code. */
+private fun migrateLegacyAccessKeys() {
+    val db = FirebaseFirestore.getInstance()
+    db.collection("access_keys").get().addOnSuccessListener { snapshot ->
+        for (doc in snapshot.documents) {
+            val key = doc.toObject(StaffAccessKey::class.java) ?: continue
+            val clean = key.accessCode.replace(Regex("[^A-Za-z0-9]"), "").uppercase()
+            if (clean.length == 8 && doc.id != clean) {
+                val batch = db.batch()
+                batch.set(db.collection("access_keys").document(clean), key.copy(id = clean))
+                batch.delete(doc.reference)
+                batch.commit()
             }
         }
     }
