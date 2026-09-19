@@ -1492,7 +1492,7 @@ private fun GenerateStaffKeyModal(
                             val nowStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                             onSave(
                                 StaffAccessKey(
-                                    id = System.currentTimeMillis().toString(),
+                                    id = generatedCode.replace("-", ""), // doc ID must equal the clean code (used by Firestore rules)
                                     accessCode = generatedCode,
                                     nickname = nickname.trim(),
                                     role = selectedRole,
@@ -1528,7 +1528,8 @@ private fun ViewQrCodeModal(staffKey: StaffAccessKey, onDismiss: () -> Unit) {
 
 private fun generateRandom8CharKey(): String {
     val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    val first4 = (1..4).map { chars[Random.nextInt(chars.length)] }.joinToString("")
-    val last4 = (1..4).map { chars[Random.nextInt(chars.length)] }.joinToString("")
+    val rng = SecureRandom()
+    val first4 = (1..4).map { chars[rng.nextInt(chars.length)] }.joinToString("")
+    val last4 = (1..4).map { chars[rng.nextInt(chars.length)] }.joinToString("")
     return "$first4-$last4"
 }
