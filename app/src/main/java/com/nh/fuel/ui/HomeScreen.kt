@@ -1766,9 +1766,11 @@ fun NumberField(
     OutlinedTextField(
         value = textValue,
         onValueChange = { input ->
-            if (enabled && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+            // Limit to at most 2 decimal places at entry time so litres are never stored (or
+            // synced to Firebase) with floating-point noise beyond 2 decimals.
+            if (enabled && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                 textValue = input
-                val parsed = input.toDoubleOrNull() ?: 0.0
+                val parsed = round2(input.toDoubleOrNull() ?: 0.0)
                 onValueChange(parsed)
             }
         },
