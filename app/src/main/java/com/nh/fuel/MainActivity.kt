@@ -207,6 +207,45 @@ class MainActivity : ComponentActivity() {
                     val allCreditsFlow = firestoreRepository.observeAllCredits().collectAsState(initial = emptyList())
                     val allCredits = allCreditsFlow.value
 
+                    // --- ONE-TIME CLEANUP: snap any legacy record/expense/credit that was saved with
+                    // more than 2 decimal places (floating-point noise like 6824.500000000001) back to
+                    // 2 decimals, and push the corrected value back to Firestore so every device sees
+                    // clean numbers. Owner-only so read-only staff sessions never attempt writes; each
+                    // document is only re-saved once its rounded value actually differs from what's stored.
+                    LaunchedEffect(allRecords) {
+                        if (!activeSession.isReadOnly) {
+                            allRecords.forEach { rec ->
+                                if (rec.needsRoundingMigration()) {
+                                    try {
+                                        firestoreRepository.saveFuelRecord(rec.normalizeRounding())
+                                    } catch (_: Exception) { /* best-effort; will retry next snapshot */ }
+                                }
+                            }
+                        }
+                    }
+                    LaunchedEffect(allExpenses) {
+                        if (!activeSession.isReadOnly) {
+                            allExpenses.forEach { exp ->
+                                if (exp.needsRoundingMigration()) {
+                                    try {
+                                        firestoreRepository.saveExpense(exp.normalizeRounding())
+                                    } catch (_: Exception) { /* best-effort; will retry next snapshot */ }
+                                }
+                            }
+                        }
+                    }
+                    LaunchedEffect(allCredits) {
+                        if (!activeSession.isReadOnly) {
+                            allCredits.forEach { cred ->
+                                if (cred.needsRoundingMigration()) {
+                                    try {
+                                        firestoreRepository.saveCredit(cred.normalizeRounding())
+                                    } catch (_: Exception) { /* best-effort; will retry next snapshot */ }
+                                }
+                            }
+                        }
+                    }
+
                     var activeBusinessDate by remember {
                         mutableStateOf(
                             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
