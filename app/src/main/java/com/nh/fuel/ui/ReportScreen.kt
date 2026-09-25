@@ -100,26 +100,26 @@ fun ReportScreen(
         else allExpenses.filter { it.date in periodDates }
     }
 
-    val totalPetrolLitre = filteredRecords.sumOf { it.totalPetrolSell }
-    val totalDieselLitre = filteredRecords.sumOf { it.totalDieselSell }
-    val totalVolumeLitre = totalPetrolLitre + totalDieselLitre
+    val totalPetrolLitre = round2(filteredRecords.sumOf { it.totalPetrolSell })
+    val totalDieselLitre = round2(filteredRecords.sumOf { it.totalDieselSell })
+    val totalVolumeLitre = round2(totalPetrolLitre + totalDieselLitre)
 
-    val totalPetrolRev = filteredRecords.sumOf { it.totalPetrolRevenue }
-    val totalDieselRev = filteredRecords.sumOf { it.totalDieselRevenue }
-    val grossRevenue = totalPetrolRev + totalDieselRev
+    val totalPetrolRev = round2(filteredRecords.sumOf { it.totalPetrolRevenue })
+    val totalDieselRev = round2(filteredRecords.sumOf { it.totalDieselRevenue })
+    val grossRevenue = round2(totalPetrolRev + totalDieselRev)
 
-    val totalExpenses = filteredExpenses.sumOf { it.amount }
+    val totalExpenses = round2(filteredExpenses.sumOf { it.amount })
 
-    val totalCash = filteredRecords.sumOf { it.dailyCashCollected }
-    val totalDigital = filteredRecords.sumOf { it.dailyDigitalCollected }
-    val totalCreditIssued = filteredRecords.sumOf { it.dailyCreditCollected }
-    val totalMismatch = filteredRecords.sumOf { it.dailyMismatch }
+    val totalCash = round2(filteredRecords.sumOf { it.dailyCashCollected })
+    val totalDigital = round2(filteredRecords.sumOf { it.dailyDigitalCollected })
+    val totalCreditIssued = round2(filteredRecords.sumOf { it.dailyCreditCollected })
+    val totalMismatch = round2(filteredRecords.sumOf { it.dailyMismatch })
 
-    val totalPetrolRefill = filteredRecords.sumOf { it.petrolRefill }
-    val totalDieselRefill = filteredRecords.sumOf { it.dieselRefill }
-    val totalPetrolVariation = filteredRecords.sumOf { it.petrolVariation }
-    val totalDieselVariation = filteredRecords.sumOf { it.dieselVariation }
-    val netTotalVariation = totalPetrolVariation + totalDieselVariation
+    val totalPetrolRefill = round2(filteredRecords.sumOf { it.petrolRefill })
+    val totalDieselRefill = round2(filteredRecords.sumOf { it.dieselRefill })
+    val totalPetrolVariation = round2(filteredRecords.sumOf { it.petrolVariation })
+    val totalDieselVariation = round2(filteredRecords.sumOf { it.dieselVariation })
+    val netTotalVariation = round2(totalPetrolVariation + totalDieselVariation)
 
     val petrolColor = Color(0xFFFF9800)  // Orange
     val dieselColor = Color(0xFF29B6F6)  // Light Blue
@@ -319,9 +319,9 @@ fun ReportScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    val s1Rev = filteredRecords.sumOf { it.shift1.getRevenue(it.petrolPrice, it.dieselPrice) }
-                    val s2Rev = filteredRecords.sumOf { it.shift2.getRevenue(it.petrolPrice, it.dieselPrice) }
-                    val s3Rev = filteredRecords.sumOf { it.shift3.getRevenue(it.petrolPrice, it.dieselPrice) }
+                    val s1Rev = round2(filteredRecords.sumOf { it.shift1.getRevenue(it.petrolPrice, it.dieselPrice) })
+                    val s2Rev = round2(filteredRecords.sumOf { it.shift2.getRevenue(it.petrolPrice, it.dieselPrice) })
+                    val s3Rev = round2(filteredRecords.sumOf { it.shift3.getRevenue(it.petrolPrice, it.dieselPrice) })
                     val maxShiftRev = maxOf(s1Rev, s2Rev, s3Rev, 1.0)
 
                     ShiftBarItem("Shift 1", s1Rev, maxShiftRev, Color(0xFF7E57C2))
