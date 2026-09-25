@@ -53,4 +53,32 @@ data class DailyFuelRecord(
     val dailyCreditCollected: Double get() = round2(shift1.totalCreditCollected + shift2.totalCreditCollected + shift3.totalCreditCollected)
     val dailyTotalCollected: Double get() = round2(dailyCashCollected + dailyDigitalCollected + dailyCreditCollected)
     val dailyMismatch: Double get() = round2(dailyTotalCollected - grandTotalRevenue)
+
+    /**
+     * Returns this record with every raw stored litre/rupee field snapped to 2 decimals.
+     * Used to clean up legacy Firestore documents that were saved before rounding was enforced
+     * (e.g. 6824.500000000001) so both the local copy and Firestore end up holding clean values.
+     */
+    fun normalizeRounding(): DailyFuelRecord = copy(
+        petrolTotal = round2(petrolTotal),
+        petrolRefill = round2(petrolRefill),
+        petrolVariation = round2(petrolVariation),
+        lastPetrolRefill = lastPetrolRefill.normalizeRounding(),
+        lastPetrolVariationAmount = round2(lastPetrolVariationAmount),
+        lastPetrolDipAmount = round2(lastPetrolDipAmount),
+        dieselTotal = round2(dieselTotal),
+        dieselRefill = round2(dieselRefill),
+        dieselVariation = round2(dieselVariation),
+        lastDieselRefill = lastDieselRefill.normalizeRounding(),
+        lastDieselVariationAmount = round2(lastDieselVariationAmount),
+        lastDieselDipAmount = round2(lastDieselDipAmount),
+        petrolPrice = round2(petrolPrice),
+        dieselPrice = round2(dieselPrice),
+        shift1 = shift1.normalizeRounding(),
+        shift2 = shift2.normalizeRounding(),
+        shift3 = shift3.normalizeRounding()
+    )
+
+    /** True if any raw field in this record holds more precision than 2 decimals. */
+    fun needsRoundingMigration(): Boolean = this != normalizeRounding()
 }
