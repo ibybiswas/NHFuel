@@ -66,6 +66,7 @@ import com.nh.fuel.data.KeyStatus
 import com.nh.fuel.data.NozzleShift
 import com.nh.fuel.data.Role
 import com.nh.fuel.data.StaffAccessKey
+import com.nh.fuel.data.round2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -1129,7 +1130,7 @@ private fun HardwareMaintenanceScreen(
 
                 OutlinedTextField(
                     value = newOpenValueInput,
-                    onValueChange = { input -> if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$"))) newOpenValueInput = input },
+                    onValueChange = { input -> if (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$"))) newOpenValueInput = input },
                     label = { Text("New Hardware Open Reading (L)", fontSize = 10.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -1180,7 +1181,7 @@ private fun HardwareMaintenanceScreen(
                     enabled = countdown == 0,
                     onClick = {
                         showConfirmDialog = false
-                        val parsedVal = newOpenValueInput.toDoubleOrNull() ?: 0.0
+                        val parsedVal = round2(newOpenValueInput.toDoubleOrNull() ?: 0.0)
                         val updatedRecord = applyNozzleReset(currentRecord, selectedShift, selectedMpd, selectedNozzle, parsedVal)
                         onRecordChanged(updatedRecord)
                         ActivityLogger.log(session, "reset $selectedMpd $selectedNozzle to $parsedVal L")
