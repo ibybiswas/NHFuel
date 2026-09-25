@@ -38,6 +38,7 @@ import com.nh.fuel.data.DayShift
 import com.nh.fuel.data.DispenserShift
 import com.nh.fuel.data.ExpenseItem
 import com.nh.fuel.data.Role
+import com.nh.fuel.data.round2
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -266,9 +267,9 @@ fun SalesScreen(
                     OutlinedTextField(
                         value = petrolPriceText,
                         onValueChange = { input ->
-                            if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+                            if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                                 petrolPriceText = input
-                                val valParsed = input.toDoubleOrNull() ?: 0.0
+                                val valParsed = round2(input.toDoubleOrNull() ?: 0.0)
                                 onRecordChanged(currentRecord.copy(petrolPrice = valParsed))
                                 ActivityLogger.log(session, "updated petrol rate to ₹$valParsed for ${currentRecord.date}")
                             }
@@ -283,9 +284,9 @@ fun SalesScreen(
                     OutlinedTextField(
                         value = dieselPriceText,
                         onValueChange = { input ->
-                            if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+                            if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                                 dieselPriceText = input
-                                val valParsed = input.toDoubleOrNull() ?: 0.0
+                                val valParsed = round2(input.toDoubleOrNull() ?: 0.0)
                                 onRecordChanged(currentRecord.copy(dieselPrice = valParsed))
                                 ActivityLogger.log(session, "updated diesel rate to ₹$valParsed for ${currentRecord.date}")
                             }
@@ -712,9 +713,9 @@ private fun MpdSalesColumn(
             OutlinedTextField(
                 value = cashText,
                 onValueChange = { input ->
-                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                         cashText = input
-                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        val parsed = round2(input.toDoubleOrNull() ?: 0.0)
                         onDispenserUpdated(dispenser.copy(cashCollected = parsed))
                         ActivityLogger.log(session, "updated $shiftTitle $mpdTitle cash collection to ₹$parsed for $currentRecordDate")
                     }
@@ -729,9 +730,9 @@ private fun MpdSalesColumn(
             OutlinedTextField(
                 value = digitalText,
                 onValueChange = { input ->
-                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                         digitalText = input
-                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        val parsed = round2(input.toDoubleOrNull() ?: 0.0)
                         onDispenserUpdated(dispenser.copy(digitalCollected = parsed))
                         ActivityLogger.log(session, "updated $shiftTitle $mpdTitle digital collection to ₹$parsed for $currentRecordDate")
                     }
@@ -746,9 +747,9 @@ private fun MpdSalesColumn(
             OutlinedTextField(
                 value = creditText,
                 onValueChange = { input ->
-                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d*$")))) {
+                    if (canEdit && (input.isEmpty() || input.matches(Regex("^\\d*\\.?\\d{0,2}$")))) {
                         creditText = input
-                        val parsed = input.toDoubleOrNull() ?: 0.0
+                        val parsed = round2(input.toDoubleOrNull() ?: 0.0)
                         onDispenserUpdated(dispenser.copy(creditCollected = parsed))
                         ActivityLogger.log(session, "updated $shiftTitle $mpdTitle credit collection to ₹$parsed for $currentRecordDate")
                     }
