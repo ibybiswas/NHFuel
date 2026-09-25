@@ -18,7 +18,13 @@ data class ExpenseItem(
     val amount: Double = 0.0,
     val date: String = "", // Format: YYYY-MM-DD
     val timestamp: String = "" // Entry timestamp
-)
+) {
+    /** Returns this expense with `amount` snapped to 2 decimals. */
+    fun normalizeRounding(): ExpenseItem = copy(amount = round2(amount))
+
+    /** True if `amount` holds more precision than 2 decimals. */
+    fun needsRoundingMigration(): Boolean = this != normalizeRounding()
+}
 
 @Dao
 interface ExpenseDao {
