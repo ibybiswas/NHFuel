@@ -12,14 +12,22 @@ fun round2(value: Double): Double =
 data class RefillEvent(
     val amount: Double = 0.0,
     val timestamp: String = ""
-)
+) {
+    /** Returns this event with `amount` snapped to 2 decimals (fixes legacy Firestore data). */
+    fun normalizeRounding(): RefillEvent = copy(amount = round2(amount))
+}
 
 @IgnoreExtraProperties
 data class TestingEvent(
     val petrolTestingAmount: Double = 0.0,
     val dieselTestingAmount: Double = 0.0,
     val timestamp: String = ""
-)
+) {
+    fun normalizeRounding(): TestingEvent = copy(
+        petrolTestingAmount = round2(petrolTestingAmount),
+        dieselTestingAmount = round2(dieselTestingAmount)
+    )
+}
 
 @IgnoreExtraProperties
 data class NozzleShift(
@@ -36,6 +44,14 @@ data class NozzleShift(
     // litres (or not yet closed) would otherwise silently "lose" part of the test amount.
     val sale: Double get() = round2(grossSale - testing)
     val isClosed: Boolean get() = close > 0.0 && close >= open
+
+    /** Returns this reading with every stored litre value snapped to 2 decimals. */
+    fun normalizeRounding(): NozzleShift = copy(
+        open = round2(open),
+        close = round2(close),
+        testing = round2(testing),
+        originalOpenBeforeReset = round2(originalOpenBeforeReset)
+    )
 }
 
 @IgnoreExtraProperties
@@ -62,6 +78,17 @@ data class DispenserShift(
     fun getMismatch(petrolPrice: Double, dieselPrice: Double): Double {
         return round2(totalCollected - getRevenue(petrolPrice, dieselPrice))
     }
+
+    fun normalizeRounding(): DispenserShift = copy(
+        petrolN2 = petrolN2.normalizeRounding(),
+        petrolN3 = petrolN3.normalizeRounding(),
+        dieselN1 = dieselN1.normalizeRounding(),
+        dieselN4 = dieselN4.normalizeRounding(),
+        cashCollected = round2(cashCollected),
+        digitalCollected = round2(digitalCollected),
+        creditCollected = round2(creditCollected),
+        lastTestingEvent = lastTestingEvent.normalizeRounding()
+    )
 }
 
 @IgnoreExtraProperties
@@ -87,4 +114,9 @@ data class DayShift(
     fun getMismatch(petrolPrice: Double, dieselPrice: Double): Double {
         return round2(totalCollected - getRevenue(petrolPrice, dieselPrice))
     }
+
+    fun normalizeRounding(): DayShift = copy(
+        mpd1 = mpd1.normalizeRounding(),
+        mpd2 = mpd2.normalizeRounding()
+    )
 }
